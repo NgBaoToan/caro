@@ -20,12 +20,15 @@ public class StartMenuPanel extends JPanel {
     private int selectedMode   = 0;
     // 0 = X, 1 = O
     private int selectedSymbol = 0;
+    // Index into Difficulty.values(); Medium is the default.
+    private int selectedLevel  = 1;
 
     private final Runnable onStart;
 
     private final ModeCard      cardAI, cardHuman;
     private final SymbolTile    tileX, tileO;
-    private final JLabel        labelMode, labelSymbol, labelHint;
+    private final LevelTile[]   levelTiles;
+    private final JLabel        labelMode, labelSymbol, labelLevel, labelHint;
     private final ClassicButton startBtn, exitBtn;
 
     private int titleBaseline = 160;   // recomputed in layoutUI()
@@ -37,6 +40,7 @@ public class StartMenuPanel extends JPanel {
 
         labelMode   = sectionLabel("SELECT MODE");
         labelSymbol = sectionLabel("CHOOSE YOUR SIDE");
+        labelLevel  = sectionLabel("DIFFICULTY");
 
         labelHint = new JLabel("X always moves first", SwingConstants.CENTER);
         labelHint.setFont(Theme.ui(Font.PLAIN, 12));
@@ -47,6 +51,10 @@ public class StartMenuPanel extends JPanel {
 
         tileX = new SymbolTile(0);
         tileO = new SymbolTile(1);
+
+        Difficulty[] levels = Difficulty.values();
+        levelTiles = new LevelTile[levels.length];
+        for (int i = 0; i < levels.length; i++) levelTiles[i] = new LevelTile(i, levels[i]);
 
         startBtn = new ClassicButton("START", ClassicButton.Kind.PRIMARY);
         startBtn.setFontSize(15);
@@ -62,6 +70,8 @@ public class StartMenuPanel extends JPanel {
         add(cardHuman);
         add(tileX);
         add(tileO);
+        add(labelLevel);
+        for (LevelTile lt : levelTiles) add(lt);
         add(startBtn);
         add(exitBtn);
 
@@ -87,7 +97,7 @@ public class StartMenuPanel extends JPanel {
         int cx = W / 2;
 
         int cardW = 212, cardH = 118, gap = 20;
-        int blockH = 96 + 22 + cardH + 34 + 18 + 72 + 34 + 52 + 16 + 40;
+        int blockH = 96 + 22 + cardH + 34 + 18 + 72 + 22 + 18 + 40 + 22 + 52 + 16 + 40;
         int top = Math.max(40, (H - blockH) / 2);
 
         titleBaseline = top + 64;
@@ -108,7 +118,18 @@ public class StartMenuPanel extends JPanel {
         int tile = 72, tgap = 16;
         tileX.setBounds(cx - tile - tgap / 2, y, tile, tile);
         tileO.setBounds(cx + tgap / 2,        y, tile, tile);
-        y += tile + 12;
+        y += tile + 22;
+
+        labelLevel.setBounds(cx - 160, y, 320, 16);
+        y += 18;
+
+        int levelW = 92, levelH = 40, lgap = 10;
+        int levelRow = levelTiles.length * levelW + (levelTiles.length - 1) * lgap;
+        for (int i = 0; i < levelTiles.length; i++) {
+            levelTiles[i].setBounds(cx - levelRow / 2 + i * (levelW + lgap),
+                                    y, levelW, levelH);
+        }
+        y += levelH + 12;
 
         labelHint.setBounds(cx - 160, y, 320, 16);
         y += 22;
@@ -128,12 +149,21 @@ public class StartMenuPanel extends JPanel {
         labelHint.setVisible(vsAI);
         tileX.setVisible(vsAI);
         tileO.setVisible(vsAI);
+        labelLevel.setVisible(vsAI);
+        for (LevelTile lt : levelTiles) lt.setVisible(vsAI);
     }
 
     // ── Read by GameFrame ────────────────────────────────────
     public int     getSelectedMode() { return selectedMode; }
     public boolean isVsAI()          { return selectedMode == 0; }
     public boolean playerChoseX()    { return selectedSymbol == 0; }
+
+    /** The level chosen on this screen. Two-player games ignore it. */
+    public Difficulty getDifficulty() {
+        Difficulty[] levels = Difficulty.values();
+        int i = Math.max(0, Math.min(selectedLevel, levels.length - 1));
+        return levels[i];
+    }
 
     // ── Background ───────────────────────────────────────────
     @Override
@@ -304,6 +334,50 @@ public class StartMenuPanel extends JPanel {
 
             int tile = w - 22;
             Theme.drawStoneTile(g2, index == 0, 11, (h - tile) / 2, tile);
+
+            g2.dispose();
+        }
+    }
+
+    // ── Difficulty picker ────────────────────────────────────
+    private class LevelTile extends JComponent {
+        private final int        index;
+        private final Difficulty level;
+        private boolean hovered = false;
+
+        LevelTile(int index, Difficulty level) {
+            this.index = index;
+            this.level = level;
+            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+            addMouseListener(new MouseAdapter() {
+                @Override public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }
+                @Override public void mouseExited(MouseEvent e)  { hovered = false; repaint(); }
+                @Override public void mousePressed(MouseEvent e) {
+                    selectedLevel = LevelTile.this.index;
+                    for (LevelTile lt : levelTiles) lt.repaint();
+                }
+            });
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2 = (Graphics2D) g.create();
+            Theme.antialias(g2);
+
+            int w = getWidth(), h = getHeight();
+            boolean sel = (selectedLevel == index);
+
+            g2.setColor(hovered ? Theme.SURFACE_2 : Theme.SURFACE);
+            g2.fill(Theme.round(0, 0, w, h, 8));
+
+            g2.setStroke(new BasicStroke(sel ? 2f : 1f));
+            g2.setColor(sel ? Theme.ACCENT : Theme.BORDER);
+            g2.draw(Theme.round(1, 1, w - 2, h - 2, 8));
+
+            g2.setFont(Theme.ui(sel ? Font.BOLD : Font.PLAIN, 12));
+            g2.setColor(sel ? Theme.TEXT : Theme.TEXT_DIM);
+            Theme.drawCentered(g2, level.label(), w / 2, h / 2);
 
             g2.dispose();
         }

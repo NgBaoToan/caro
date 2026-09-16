@@ -32,6 +32,7 @@ Play against the computer or against a friend on one screen. The board pans free
 - [Project structure](#project-structure)
 - [Design system](#design-system)
 - [How the AI works](#how-the-ai-works)
+- [Tests](#tests)
 - [Architecture notes](#architecture-notes)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
@@ -51,7 +52,7 @@ CaroAI implements that on the desktop with Java Swing. The goal was not only a g
 - A quiet result card when a game ends — fade in, slight rise, no confetti
 - A 50x50 board that pans under a smaller window, driven by WASD
 
-**Built with:** Java 21 · Swing · AWT · Maven · a greedy heuristic AI · CardLayout · JLayeredPane
+**Built with:** Java 21 · Swing · AWT · Maven · minimax with alpha-beta pruning · SwingWorker · CardLayout · JLayeredPane
 
 Maven drives the build (see [Installing the toolchain](#installing-the-toolchain)) — one `mvn clean package` compiles, tests and packages a runnable jar, with no manual IDE setup.
 
@@ -75,7 +76,9 @@ To capture them: run the game, screenshot each state (`Win + Shift + S` on Windo
 | Feature | What it does |
 |---|---|
 | **Title screen** | Pick a mode; when playing the computer, pick X or O |
-| **Play vs computer** | A greedy heuristic opponent; you may open (X) or move second (O) |
+| **Play vs computer** | Minimax opponent with three strengths; you may open (X) or move second (O) |
+| **Difficulty** | Easy, Medium and Hard — depth, shortlist width and time budget |
+| **Search off the event thread** | The window stays responsive while Hard thinks |
 | **Two players** | Hotseat on one machine, X and O alternating correctly |
 | **Large board** | 50x50 grid; pan the camera with WASD |
 | **Hover preview** | A ghost stone shows where the next move lands |
@@ -224,7 +227,8 @@ java -cp out caroai.Main
 2. Against the computer, choose your side:
    - **X** — you open
    - **O** — the computer opens
-3. Press **START**
+3. Choose a difficulty: **Easy**, **Medium** or **Hard** (Medium by default)
+4. Press **START**
 
 The mode defaults to *Play vs Computer*, so pressing START straight away starts a valid game.
 
@@ -265,7 +269,11 @@ CaroAI/
 │   │   ├── BoardPanel.java          # Draws the board, handles mouse and keys
 │   │   ├── WinOverlayPanel.java     # Result card over a dimmed backdrop
 │   │   ├── GameEngine.java          # Rules: stones, bounds, turns, win detection
-│   │   ├── AI.java                  # Greedy heuristic opponent
+│   │   ├── AI.java                  # Minimax search: pruning, deepening, budgets
+│   │   ├── Evaluator.java           # Static evaluation and pattern recognition
+│   │   ├── Pattern.java             # The named shapes and their score ladder
+│   │   ├── Difficulty.java          # Easy / Medium / Hard search budgets
+│   │   ├── MoveHistory.java         # The move list and the undo rule
 │   │   ├── Coord.java               # Board coordinate (record)
 │   │   ├── Player.java              # One side: name, symbol, human or AI
 │   │   ├── Move.java                # A move: coordinate + who played it
@@ -274,6 +282,10 @@ CaroAI/
 │   │   ├── Board.java               # (Legacy) first JButton-grid experiment
 │   │   └── Menu.java                # (Legacy) first JMenuBar experiment
 │   └── test/java/caroai/            # Unit tests (JUnit 5 + AssertJ)
+│       ├── GameEngineTest.java      # Win rule, board edges, bounds, undo
+│       ├── EvaluatorTest.java       # One test per named pattern, plus the ladder
+│       ├── AITest.java              # Forced wins, forced blocks, colour symmetry
+│       └── MoveHistoryTest.java     # Undo across every side and history length
 ├── docs/screenshots/                # Screenshots for this README
 └── README.md
 ```
@@ -294,28 +306,85 @@ Everything visual is centralised in `Theme.java`: the palette, the font selectio
 
 ## How the AI works
 
-The AI is a **greedy heuristic** with no look-ahead. Each turn it scores every candidate square and plays the highest.
+Three layers, each replaceable on its own: a set of named shapes, a function that scores a position from them, and a search that looks ahead.
 
-### Candidate squares
+### Shapes
 
-Only empty squares with **at least one stone within one cell** are considered. This drops isolated squares and keeps the search fast on a large board.
+`Pattern` names what the evaluator can see, with a deliberately steep score ladder:
 
-### Scoring
-
-Each candidate is evaluated along **four axes**: horizontal, vertical, and both diagonals. The AI counts its own run and the opponent's run through that square:
-
-| Run length | Attack (its own) | Defence (blocking) |
+| Shape | What it looks like | Score |
 |---|---|---|
-| 5 in a row (immediate win) | 100,000 | 90,000 |
-| 4 in a row | 10,000 | 9,000 |
-| 3 in a row | 1,000 | 900 |
-| 2 in a row | 100 | 90 |
+| Closed two | `O X X _` | 100 |
+| Open two | `_ X X _` | 500 |
+| Closed three | `O X X X _` | 2,000 |
+| Broken three | `_ X X _ X _` | 12,000 |
+| Open three | `_ X X X _` | 20,000 |
+| Four | `O X X X X _` or `X X X _ X` | 200,000 |
+| Open four | `_ X X X X _` | 1,000,000 |
+| Five | `X X X X X` | 10,000,000 |
 
-So it **always takes a win** when one exists (100,000), then **always blocks** an opponent about to win (90,000), and only then extends its own shapes.
+Each tier outranks any realistic number of shapes from the tier below, so a real four is never traded away for a handful of twos. The board edge counts as a block, exactly like an opponent stone.
+
+`Four` covers the closed four and the broken four together, because each has exactly one square that completes five and each forces an immediate reply.
+
+### Scoring a position
+
+`Evaluator.evaluate()` sums our shapes, sums theirs, and returns the difference — with the opponent's total multiplied by `DEFENCE_WEIGHT`, which is **1.1**:
+
+```
+score = ourShapes - 1.1 x theirShapes
+```
+
+Keeping that multiplier at or just above 1 is what makes blocking beat building at equal run length. Below 1 the AI races the opponent and loses by a tempo, which was the old scoring bug. Our own five is worth ten million while their open four scaled is worth 1.1 million, so taking a win still beats blocking — the ladder keeps the priorities in order without special cases.
+
+### Searching
+
+On top of that sits minimax with alpha-beta pruning. Three things keep it usable on a 50x50 board:
+
+- **Shortlisting** — only empty squares within two cells of a stone are candidates, and only the best few of those survive at each node. The rest of the board is irrelevant to the position.
+- **Move ordering** — candidates are sorted by static score before being searched, so alpha-beta cuts off early and often. Most of the pruning comes from the ordering, not from the pruning rule itself.
+- **Iterative deepening** — the search runs to depth 1, then 2, and so on until the time budget expires. The move from the last depth that *finished* is the one played, so the AI always has an answer ready and never plays a half-searched one.
+
+Two tactical checks run before the search starts: take a win if one exists, otherwise block a loss if one is threatened. They are not an optimisation — they are the guarantee that no time budget, however small, can make the AI miss a win it could take now.
+
+### Difficulty
+
+Each level is a budget rather than a different algorithm, so an improvement to the evaluator lifts all three at once.
+
+| Level | Max depth | Shortlist | Time budget |
+|---|---|---|---|
+| Easy | 2 | 8 | 250 ms |
+| Medium | 4 | 12 | 700 ms |
+| Hard | 6 | 16 | 2000 ms |
+
+Easy also holds its answer back by about 200 ms. Without that it replies before your hand has left the mouse, which reads as a glitch rather than as a fast opponent.
+
+### Off the event thread
+
+The search runs in a `SwingWorker`. `BoardPanel` snapshots the position on the event thread, hands that copy to the worker, and applies the result when it returns — so the window never freezes while Hard thinks, and the search never reads a board the interface is changing underneath it. Undo, restart and returning to the menu all cancel the running search first.
 
 ### Opening move
 
-On an empty board every candidate is isolated, so `getBestMove` returns `null`. `BoardPanel` handles that case by playing near the centre of the **visible window** rather than the centre of the 50x50 board — a stone at (25,25) would be off-screen and look like a frozen game.
+An empty board has no candidate squares at all, so `findBestMove` returns `null`. `BoardPanel` handles that by playing near the centre of the **visible window** rather than the centre of the 50x50 board — a stone at (25,25) would be off-screen and look like a frozen game.
+
+---
+
+## Tests
+
+```bash
+mvn test
+```
+
+The suite is about rules and tactics rather than pixels; nothing in it needs a display.
+
+| File | What it pins down |
+|---|---|
+| `GameEngineTest` | Five in a row in all four directions; wins hard against the board edges; negative and oversized coordinates refused without changing state; undo frees the square and cancels a win |
+| `EvaluatorTest` | One test per named shape, so the ladder is fixed by name rather than by a number someone can quietly retune; defence weight at or above 1 |
+| `AITest` | Always takes an immediate win; always blocks a forced loss; answers an open three and a broken three; **a position and its colour-swapped twin produce the same move** |
+| `MoveHistoryTest` | Undo returns the board and the turn to the previous state — holding X, holding O, in a two-player game, and with a single move in the history |
+
+The colour-symmetry test is the important one. The old AI kept its own copy of the board and encoded stones by symbol instead of by owner, so choosing O inverted its idea of who was who and it started helping its opponent. That bug cannot pass this test, and no amount of tuning elsewhere would have found it.
 
 ---
 
@@ -331,7 +400,9 @@ A few decisions that are worth knowing before changing the code.
 
 **Turn order is derived, not tracked.** X always opens, so whose turn it is follows from the number of moves played. `GameFrame` recomputes it from the history rather than assigning it case by case, which is also what makes undo work for any number of stones instead of a hard-coded two.
 
-**Pending AI moves are cancellable.** The AI plays on a one-shot `Timer`. Undo, restart and returning to the menu all cancel it first, so a move from the previous position can never land on the new one.
+**Pending searches are cancellable.** The AI runs in a `SwingWorker`. Undo, restart and returning to the menu all cancel it first, so a move computed for the previous position can never land on the new one.
+
+**Undo lives outside the window.** `MoveHistory` holds the move list and the undo rule as plain data, with no Swing in it, which is why the rule can be tested directly rather than by opening a window and clicking.
 
 ---
 

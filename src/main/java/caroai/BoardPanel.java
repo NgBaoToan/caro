@@ -4,7 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The board: draws the grid and the stones, and turns mouse and keyboard input
@@ -27,8 +29,11 @@ public class BoardPanel extends JPanel {
     private List<Coord> winningLine = new ArrayList<>();
     private boolean     gameOver    = false;   // blocks clicks once the game ends
 
-    /** Pending AI move; kept so it can be cancelled on undo or restart. */
-    private Timer aiTimer = null;
+    /**
+     * The AI runs on a background thread, so a long search never freezes the
+     * window. The worker is kept so it can be cancelled on undo or restart.
+     */
+    private SwingWorker<Coord, Void> aiWorker = null;
 
     public BoardPanel(GameEngine engine, AI ai) {
         this.engine = engine;
@@ -122,54 +127,107 @@ public class BoardPanel extends JPanel {
 
     // ── AI turn ──────────────────────────────────────────────
 
-    /** Lets the AI play when it is its turn, including the opening move. */
+    /**
+     * Lets the AI play when it is its turn, including the opening move.
+     *
+     * The search runs on a worker thread. It is handed an immutable snapshot of
+     * the position taken here on the event thread, so the search never reads a
+     * board that the interface is changing underneath it, and the window stays
+     * responsive while Hard thinks.
+     */
     public void maybeAIMove() {
         if (ai == null || gameOver || !engine.getCurrentPlayer().isAI()) return;
 
-        cancelPendingAI();   // never let two AI moves wait at once
+        cancelPendingAI();   // never let two searches run at once
 
-        aiTimer = new Timer(300, ev -> {
-            aiTimer = null;
-            if (gameOver || !engine.getCurrentPlayer().isAI()) return;
+        // The opening needs no search: with an empty board there is nothing to
+        // build on, and the centre of a 50x50 board is off-screen, so a stone
+        // placed there would look like a frozen game.
+        if (engine.isEmpty()) {
+            applyAIMove(visibleCenterCell());
+            return;
+        }
 
-            Coord move = ai.getBestMove(engine);
+        final Map<Coord, GameEngine.Cell> snapshot = new HashMap<>(engine.getBoard());
+        final GameEngine.Cell mine  = engine.getAISymbol();
+        final int             limit = engine.getSize();
+        final long            floor = ai.getDifficulty().minThinkMillis();
 
-            // Opening move: with an empty board the AI has nothing to build on
-            // and returns null. Play inside the visible window — the centre of a
-            // 50x50 board is off-screen, and a stone the player cannot see looks
-            // like a frozen game.
-            if (engine.isEmpty()) move = visibleCenterCell();
+        setThinking(true);
 
-            // The AI must hand back a legal square. If it does not, find the
-            // nearest empty one; otherwise makeMove() would fail while the turn
-            // still flipped, leaving the game stuck.
-            if (move == null || engine.isOccupied(move) || !engine.isInside(move)) {
-                move = findFallbackMove();
+        aiWorker = new SwingWorker<>() {
+            @Override
+            protected Coord doInBackground() {
+                long started = System.currentTimeMillis();
+                Coord found = ai.findBestMove(snapshot, mine, limit);
+
+                // A move played back instantly reads as a glitch rather than as
+                // a fast opponent, so hold the easy levels back a little.
+                long elapsed = System.currentTimeMillis() - started;
+                if (elapsed < floor) {
+                    try { Thread.sleep(floor - elapsed); }
+                    catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+                }
+                return found;
             }
-            if (move == null) return;   // board is full
 
-            if (!engine.makeMove(move, engine.getAISymbol())) return;
+            @Override
+            protected void done() {
+                if (isCancelled()) return;
+                aiWorker = null;
+                setThinking(false);
 
-            lastMove = move;
-            GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
-            if (frame != null) frame.recordMove(move);
-            repaint();
+                Coord found;
+                try { found = get(); }
+                catch (Exception e) { found = null; }
 
-            if (engine.checkWin(move)) {
-                winningLine = engine.getWinningLine(move);
-                triggerWin();
-                return;
+                applyAIMove(found);
             }
-            engine.switchTurn();
-            repaint();
-        });
-        aiTimer.setRepeats(false);
-        aiTimer.start();
+        };
+        aiWorker.execute();
     }
 
-    /** Cancels a pending AI move (undo, restart, back to menu). */
+    /** Puts the AI's move on the board, on the event thread. */
+    private void applyAIMove(Coord move) {
+        if (gameOver || !engine.getCurrentPlayer().isAI()) return;
+
+        // The AI must hand back a legal square. If it does not, find the nearest
+        // empty one; otherwise makeMove() would fail while the turn still
+        // flipped, leaving the game stuck.
+        if (move == null || !engine.isInside(move) || engine.isOccupied(move)) {
+            move = findFallbackMove();
+        }
+        if (move == null) return;   // board is full
+
+        if (!engine.makeMove(move, engine.getAISymbol())) return;
+
+        lastMove = move;
+        GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
+        if (frame != null) frame.recordMove(move);
+        repaint();
+
+        if (engine.checkWin(move)) {
+            winningLine = engine.getWinningLine(move);
+            triggerWin();
+            return;
+        }
+        engine.switchTurn();
+        repaint();
+    }
+
+    /** Cancels a running search (undo, restart, back to menu). */
     public void cancelPendingAI() {
-        if (aiTimer != null) { aiTimer.stop(); aiTimer = null; }
+        if (ai != null) ai.cancelSearch();
+        if (aiWorker != null) {
+            aiWorker.cancel(true);
+            aiWorker = null;
+        }
+        setThinking(false);
+    }
+
+    private void setThinking(boolean thinking) {
+        GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
+        if (frame != null) frame.setThinking(thinking);
     }
 
     /** Empty cell nearest the middle of the view — the AI never skips a turn. */

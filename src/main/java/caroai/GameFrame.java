@@ -2,7 +2,6 @@ package caroai;
 
 import javax.swing.*;
 import java.awt.*;
-import java.util.Stack;
 
 /**
  * Main window.
@@ -26,11 +25,12 @@ public class GameFrame extends JFrame {
     private BoardPanel     boardPanel;
     private AI             ai;
 
-    private final Stack<Coord> moveHistory = new Stack<>();
+    private final MoveHistory history = new MoveHistory();
 
     private GameEngine.Cell playerSymbol = GameEngine.Cell.X;
     private GameEngine.Cell aiSymbol     = GameEngine.Cell.O;
     private boolean         vsAI         = true;
+    private Difficulty      difficulty   = Difficulty.MEDIUM;
 
     private WinOverlayPanel currentOverlay;
 
@@ -63,6 +63,7 @@ public class GameFrame extends JFrame {
     // ── Callback from StartMenuPanel ─────────────────────────
     private void onStartGame() {
         vsAI = startMenuPanel.isVsAI();
+        difficulty = startMenuPanel.getDifficulty();
         if (vsAI) {
             playerSymbol = startMenuPanel.playerChoseX() ? GameEngine.Cell.X : GameEngine.Cell.O;
             aiSymbol     = GameEngine.opponentOf(playerSymbol);
@@ -83,7 +84,7 @@ public class GameFrame extends JFrame {
         if (vsAI) {
             human    = new Player("You",      playerSymbol.toString(), false);
             opponent = new Player("Computer", aiSymbol.toString(),     true);
-            ai       = new AI(BOARD_SIZE, GameEngine.WIN_LENGTH);
+            ai       = new AI(BOARD_SIZE, GameEngine.WIN_LENGTH, difficulty);
         } else {
             playerSymbol = GameEngine.Cell.X;
             aiSymbol     = GameEngine.Cell.O;
@@ -99,7 +100,7 @@ public class GameFrame extends JFrame {
         if (playerSymbol == GameEngine.Cell.X) { xPlayer = human;    oPlayer = opponent; }
         else                                   { xPlayer = opponent; oPlayer = human;    }
 
-        moveHistory.clear();
+        history.clear();
         // Rule: X always opens. Derive the turn from history instead of setting
         // it by hand for each case.
         syncTurnFromHistory();
@@ -178,26 +179,22 @@ public class GameFrame extends JFrame {
     public void undoMove() {
         if (engine == null || boardPanel == null) return;
 
-        // Cancel the AI's pending move, or it would land on the rewound board.
+        // Cancel the AI's pending search, or its move would land on the rewound board.
         boardPanel.cancelPendingAI();
 
-        int firstHumanIndex = 0;
-        if (vsAI && playerSymbol == GameEngine.Cell.O) firstHumanIndex = 1;
+        int firstHumanIndex = (vsAI && playerSymbol == GameEngine.Cell.O) ? 1 : 0;
+        int target = history.lastHumanIndex(vsAI, firstHumanIndex);
 
-        int target = -1;
-        for (int i = moveHistory.size() - 1; i >= 0; i--) {
-            if (!vsAI || i % 2 == firstHumanIndex) { target = i; break; }
-        }
         // The human has not played yet (picked O, AI just opened) — nothing to undo.
         if (target < 0) { syncTurnFromHistory(); boardPanel.repaint(); return; }
 
-        while (moveHistory.size() > target) {
-            engine.undoMove(moveHistory.pop());
+        for (Coord c : history.rewindTo(target)) {
+            engine.undoMove(c);
         }
 
         removeOverlay();
         boardPanel.clearGameOver();
-        boardPanel.setLastMove(moveHistory.isEmpty() ? null : moveHistory.peek());
+        boardPanel.setLastMove(history.last());
         syncTurnFromHistory();
         boardPanel.repaint();
 
@@ -209,11 +206,19 @@ public class GameFrame extends JFrame {
     /** X always opens: an even number of moves means X is to play. */
     private void syncTurnFromHistory() {
         if (engine == null || xPlayer == null) return;
-        engine.setCurrentPlayer(moveHistory.size() % 2 == 0 ? xPlayer : oPlayer);
+        engine.setCurrentPlayer(history.xToMove() ? xPlayer : oPlayer);
     }
 
     public void restartGame()        { startGame(); }
-    public void recordMove(Coord c)  { moveHistory.push(c); }
+    public void recordMove(Coord c)  { history.push(c); }
+
+    /** Difficulty of the game in progress, shown in the side rail. */
+    public Difficulty getDifficulty() { return vsAI ? difficulty : null; }
+
+    /** Called by the board while a background search is running. */
+    public void setThinking(boolean thinking) {
+        if (menuPanel != null) menuPanel.setThinking(thinking);
+    }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(GameFrame::new);

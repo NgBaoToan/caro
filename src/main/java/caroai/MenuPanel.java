@@ -12,8 +12,12 @@ public class MenuPanel extends JPanel {
     private static final int WIDTH = 248;
 
     private final TurnCard turnCard;
+    private final String   difficultyLabel;
 
     public MenuPanel(GameFrame frame) {
+        Difficulty level = frame.getDifficulty();
+        difficultyLabel  = (level == null) ? "Two players" : level.label();
+
         setLayout(null);
         setOpaque(true);
         setBackground(Theme.SURFACE);
@@ -68,6 +72,11 @@ public class MenuPanel extends JPanel {
         turnCard.setSymbol(symbol);
     }
 
+    /** Shows that a background search is running. */
+    public void setThinking(boolean thinking) {
+        turnCard.setThinking(thinking);
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
@@ -99,8 +108,9 @@ public class MenuPanel extends JPanel {
         // ── Hints and credit at the bottom ───────────────────
         g2.setFont(Theme.ui(Font.PLAIN, 10));
         g2.setColor(Theme.TEXT_FAINT);
-        g2.drawString("W A S D  \u2014  pan the board", pad, h - 52);
-        g2.drawString("X always moves first",           pad, h - 36);
+        g2.drawString("Difficulty  \u2014  " + difficultyLabel, pad, h - 68);
+        g2.drawString("W A S D  \u2014  pan the board",       pad, h - 52);
+        g2.drawString("X always moves first",                 pad, h - 36);
 
         g2.setColor(Theme.alpha(Theme.GOLD, 150));
         g2.fillRect(pad, h - 26, 18, 1);
@@ -115,8 +125,9 @@ public class MenuPanel extends JPanel {
     // ── Turn indicator ───────────────────────────────────────
     static class TurnCard extends JComponent {
 
-        private String symbol = "X";
-        private float  glow   = 0f;
+        private String  symbol   = "X";
+        private float   glow     = 0f;
+        private boolean thinking = false;
 
         TurnCard() {
             Timer t = new Timer(40, e -> {
@@ -129,6 +140,13 @@ public class MenuPanel extends JPanel {
         void setSymbol(String s) {
             if (s != null && !s.equals(symbol)) {
                 symbol = s;
+                repaint();
+            }
+        }
+
+        void setThinking(boolean t) {
+            if (t != thinking) {
+                thinking = t;
                 repaint();
             }
         }
@@ -160,7 +178,8 @@ public class MenuPanel extends JPanel {
 
             g2.setFont(Theme.ui(Font.PLAIN, 10));
             g2.setColor(Theme.TEXT_FAINT);
-            Theme.drawTracked(g2, "NOW PLAYING", textX, h / 2f - 8, 1.4f);
+            Theme.drawTracked(g2, thinking ? "THINKING\u2026" : "NOW PLAYING",
+                              textX, h / 2f - 8, 1.4f);
 
             g2.setFont(Theme.display(Font.BOLD, 21));
             g2.setColor(Theme.TEXT);
