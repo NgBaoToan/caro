@@ -34,7 +34,7 @@ Play against the computer or against a friend on one screen. The board pans free
 - [How the AI works](#how-the-ai-works)
 - [Tests](#tests)
 - [Architecture notes](#architecture-notes)
-- [Troubleshooting](#troubleshooting)
+- [Technology & Features](#technology--features)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -406,29 +406,56 @@ A few decisions that are worth knowing before changing the code.
 
 ---
 
-## Troubleshooting
+## Technology & Features
 
-**The window does not open**
-- Check `java` and `mvn` are on PATH: `java -version`, `mvn -version`
-- With Maven, make sure `mvn clean package` succeeded before `java -jar target/caroai.jar`
+Everything the project is actually built from, and where to find it in the source.
 
-**`error: package caroai does not exist`**
-- Compiling by hand, compile the whole tree at once as shown in [Option 2](#option-2--javac-no-maven)
+### Language & platform
 
-**`javac: command not found`**
-- You have a JRE, not a full JDK — reinstall per [Installing the toolchain](#installing-the-toolchain)
+| Technology | Used for |
+|---|---|
+| **Java 21** | The whole codebase. `Coord` and `Move` are records; pattern matching on `switch` is used where it reads more clearly than a chain of `if` |
+| **Java Swing** | Every window, panel and control — `JFrame`, `JPanel`, `JComponent`, `JLayeredPane`, `CardLayout` |
+| **Java AWT / Graphics2D** | All drawing: the board, the stones, the buttons, the title screen background |
+| **Maven** | Build, dependency management, testing, packaging — see [Running the game](#running-the-game) |
+| **JUnit 5 + AssertJ** | The test suite — see [Tests](#tests) |
+| **JaCoCo** | Test coverage reporting, wired into `mvn test` via `pom.xml` |
 
-**`mvn: command not found`**
-- Maven is not on PATH — recheck the install steps for your OS
+### Swing techniques in use
 
-**WASD does nothing**
-- Click once on the board so it takes keyboard focus
+| Technique | Where | Why |
+|---|---|---|
+| **`CardLayout`** | `GameFrame` | Switches between the title screen and the game without separate windows |
+| **`JLayeredPane` + `POPUP_LAYER`** | `GameFrame`, `WinOverlayPanel` | Floats the result card above the board and side rail without disturbing their layout |
+| **Custom painting (`paintComponent` + `Graphics2D`)** | `BoardPanel`, `MenuPanel`, `StartMenuPanel`, `WinOverlayPanel`, `ClassicButton` | Every visual in the game is hand-drawn; nothing uses the default Swing look-and-feel |
+| **`SwingWorker`** | `BoardPanel` | Runs the AI search off the event thread so the window never freezes while it thinks |
+| **Swing `Timer`** | `MenuPanel.TurnCard` (pulse animation), `ClassicButton` (hover animation), `WinOverlayPanel` (entrance animation), `BoardPanel` (win-line blink) | Every animation in the interface is a repeating or one-shot `Timer`, not a separate animation library |
+| **`KeyListener` / `MouseListener` / `MouseMotionListener`** | `BoardPanel` (WASD panning, click-to-place, hover preview), `StartMenuPanel`, `ClassicButton` (press/hover feedback) | All input handling |
+| **`InputMap` / `ActionMap` key bindings** | `WinOverlayPanel` | `R` to play again, `Esc` to return to the menu, bound at the window level rather than to one component |
+| **`RadialGradientPaint`** | `StartMenuPanel` | Darkens the title screen toward its edges |
+| **Dynamic font fallback** | `Theme.pick()` | Probes `GraphicsEnvironment` for Georgia → Cambria → Noto Serif (and a sans equivalent) so the interface looks right on Windows, macOS and Linux without bundling font files |
 
-**Blurry interface on a high-DPI display (Windows)**
-- Add a JVM flag:
-  ```bash
-  java -Dsun.java2d.uiScale=1.0 -jar target/caroai.jar
-  ```
+### Game logic
+
+| Technique | Where | Why |
+|---|---|---|
+| **Minimax with alpha-beta pruning** | `AI.minimax()` | The search algorithm — see [How the AI works](#how-the-ai-works) |
+| **Iterative deepening** | `AI.findBestMove()` | Runs depth 1, 2, 3… under a time budget, so a move is always ready |
+| **Move-ordering shortlist** | `AI.shortlist()` | Candidates are scored and sorted before being searched, which is where most of the pruning comes from |
+| **Static position evaluation** | `Evaluator` | Named shapes with a fixed score ladder — see [How the AI works](#how-the-ai-works) |
+| **Immutable coordinate record** | `Coord` | Replaces the mutable `java.awt.Point` that used to double as a `HashMap` key |
+| **Single source of truth for board state** | `GameEngine` | The AI reads the engine's map directly instead of keeping its own mirror |
+| **Derived turn order** | `MoveHistory.xToMove()` | Whose turn it is follows from the move count rather than being tracked separately |
+
+### Testing
+
+| Technology | Used for |
+|---|---|
+| **JUnit 5** (`@Test`, `@DisplayName`) | Test structure — every test names the rule it checks |
+| **AssertJ** fluent assertions | Readable failures (`assertThat(...).isEqualTo(...)`, `.containsExactly(...)`, `.isIn(...)`) |
+| **Deterministic AI testing** | Fixed positions and colour-swapped mirrors, rather than random play, so a failure always points at the same rule |
+
+See [Tests](#tests) for what each test file actually checks.
 
 ---
 
