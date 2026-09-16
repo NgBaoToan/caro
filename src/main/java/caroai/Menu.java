@@ -1,23 +1,24 @@
-package scr;
+package caroai;
 
 import javax.swing.*;
 import java.awt.*;
 
-
-
+/**
+ * Legacy prototype: the first JMenuBar experiment.
+ * Kept for reference only — the game starts from {@link Main}.
+ */
 public class Menu {
 
     public static void main(String[] args) {
         int size = 15;
-        JFrame frame = new JFrame("Cờ Caro");
+        JFrame frame = new JFrame("Caro");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(600, 600);
 
-        // Tạo menu
-        JMenuBar menuBar = new JMenuBar();
-        JMenu menu = new JMenu("Menu");
-        JMenuItem settingItem = new JMenuItem("Cài đặt");
-        JMenuItem exitItem = new JMenuItem("Thoát");
+        JMenuBar menuBar  = new JMenuBar();
+        JMenu    menu     = new JMenu("Menu");
+        JMenuItem settingItem = new JMenuItem("Settings");
+        JMenuItem exitItem    = new JMenuItem("Exit");
 
         menu.add(settingItem);
         menu.add(exitItem);
@@ -39,11 +40,7 @@ public class Menu {
                 int row = i, col = j;
                 buttons[i][j].addActionListener(e -> {
                     if (buttons[row][col].getIcon() == null) {
-                        if (isXTurn[0]) {
-                            buttons[row][col].setIcon(xIcon);
-                        } else {
-                            buttons[row][col].setIcon(oIcon);
-                        }
+                        buttons[row][col].setIcon(isXTurn[0] ? xIcon : oIcon);
                         isXTurn[0] = !isXTurn[0];
                     }
                 });
@@ -51,17 +48,12 @@ public class Menu {
             }
         }
 
-        // Xử lý sự kiện "Cài đặt"
         settingItem.addActionListener(e -> {
-            String[] options = {
-                "Đánh 2 người",
-                "1 người đánh với máy",
-                "1 người đánh với người Asia"
-            };
+            String[] options = { "Two players", "Play vs computer" };
             int choice = JOptionPane.showOptionDialog(
                 frame,
-                "Chọn chế độ chơi:",
-                "Cài đặt",
+                "Choose a game mode:",
+                "Settings",
                 JOptionPane.DEFAULT_OPTION,
                 JOptionPane.QUESTION_MESSAGE,
                 null,
@@ -69,19 +61,15 @@ public class Menu {
                 options[0]
             );
             if (choice == 0) {
-                JOptionPane.showMessageDialog(frame, "Bạn đã chọn chế độ đánh 2 người.");
+                JOptionPane.showMessageDialog(frame, "Two-player mode selected.");
             } else if (choice == 1) {
-                JOptionPane.showMessageDialog(frame, "Bạn đã chọn chế độ 1 người đánh với máy.");
-            } else if (choice == 2) {
-                JOptionPane.showMessageDialog(frame, "Bạn đã chọn chế độ 1 người đánh với người Asia.");
+                JOptionPane.showMessageDialog(frame, "Play-vs-computer mode selected.");
             }
         });
 
-        // Xử lý sự kiện "Thoát"
         exitItem.addActionListener(e -> System.exit(0));
 
         frame.add(panel);
         frame.setVisible(true);
     }
-    
 }

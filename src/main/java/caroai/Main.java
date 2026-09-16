@@ -1,4 +1,4 @@
-package scr;
+package caroai;
 
 import javax.swing.SwingUtilities;
 

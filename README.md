@@ -1,290 +1,370 @@
-# ✦ CaroAI
+# CaroAI
 
 <div align="center">
 
-![Java](https://img.shields.io/badge/Java-11+-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Java](https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)
+![Maven](https://img.shields.io/badge/Build-Maven-C71A36?style=for-the-badge&logo=apachemaven&logoColor=white)
 ![Swing](https://img.shields.io/badge/Java%20Swing-GUI-5C5CFF?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=for-the-badge)
 
-**A desktop Gomoku (Caro) game built with Java Swing.**
-Play against a heuristic AI or challenge a friend in local 2-player mode — on an infinite scrollable board with a fully custom-painted UI.
+**A desktop Caro (Gomoku) game written in Java Swing.**
+Play against the computer or against a friend on one screen. The board pans freely and every pixel of the interface is hand-painted.
+
+*by nbaotoan*
 
 </div>
 
 ---
 
-## Table of Contents
+## Contents
 
-- [Overview](#overview)
-- [Features](#features)
+- [About](#about)
 - [Screenshots](#screenshots)
-- [Prerequisites](#prerequisites)
-- [Environment Setup](#environment-setup)
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installing the toolchain](#installing-the-toolchain)
   - [Windows](#windows)
   - [macOS](#macos)
   - [Linux](#linux)
-- [Running the Project](#running-the-project)
-  - [Command Line](#command-line)
-  - [IntelliJ IDEA](#intellij-idea)
-  - [Eclipse](#eclipse)
-  - [VS Code](#vs-code)
-- [How to Play](#how-to-play)
-- [Project Structure](#project-structure)
-- [AI Algorithm](#ai-algorithm)
+- [Running the game](#running-the-game)
+- [How to play](#how-to-play)
+- [Project structure](#project-structure)
+- [Design system](#design-system)
+- [How the AI works](#how-the-ai-works)
+- [Architecture notes](#architecture-notes)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
 
 ---
 
-## Overview
+## About
 
-Caro is a two-player strategy game where players take turns placing **X** and **O** pieces on a grid. The first player to align **5 consecutive pieces** — horizontally, vertically, or diagonally — wins.
+Caro (Gomoku) is a two-player strategy game. Players take turns placing **X** and **O** stones on a square grid; the first to line up **five in a row** — horizontally, vertically or diagonally — wins.
 
-This implementation features:
-- A fully custom-painted UI (no stock Swing look-and-feel)
-- An animated star-field start menu with mode selection
-- A glassmorphism sidebar with real-time turn indicator
-- A cinematic win/loss overlay with particle confetti
-- Infinite board panning with WASD camera controls
+CaroAI implements that on the desktop with Java Swing. The goal was not only a game that works but one that feels considered, so the interface is custom-painted rather than left to Swing's default look-and-feel:
 
-**Technologies:** Java · Java Swing · AWT · Greedy Heuristic AI · CardLayout · JLayeredPane
+- Every component is drawn by hand; no stock Swing look-and-feel
+- A parchment board in a dark wooden frame, with go-style star points
+- A dark control rail showing whose turn it is, live
+- A quiet result card when a game ends — fade in, slight rise, no confetti
+- A 50x50 board that pans under a smaller window, driven by WASD
+
+**Built with:** Java 21 · Swing · AWT · Maven · a greedy heuristic AI · CardLayout · JLayeredPane
+
+Maven drives the build (see [Installing the toolchain](#installing-the-toolchain)) — one `mvn clean package` compiles, tests and packages a runnable jar, with no manual IDE setup.
+
+---
+
+## Screenshots
+
+> The images below are placeholders. Run the game, take screenshots and drop them into `docs/screenshots/` under the filenames used here.
+
+| Title screen | In play | Result card |
+|---|---|---|
+| ![Title screen](docs/screenshots/start-menu.png) | ![In play](docs/screenshots/gameplay.png) | ![Result card](docs/screenshots/win-overlay.png) |
+| Choose a mode (vs computer / two players) and a side | Panning board with a hover preview of the next stone | Win or loss, with Play Again and Main Menu |
+
+To capture them: run the game, screenshot each state (`Win + Shift + S` on Windows, `Cmd + Shift + 4` on macOS, your desktop's screenshot tool on Linux), save into `docs/screenshots/` with the filenames above, then commit.
 
 ---
 
 ## Features
 
-| Feature | Description |
+| Feature | What it does |
 |---|---|
-| **Animated Start Menu** | Star-field background, mode selection cards, X/O symbol toggle |
-| **vs AI** | Play against a heuristic AI; choose to be X (first) or O (second) |
-| **2-Player Local** | Hotseat multiplayer on the same screen |
-| **Infinite Board** | 50×50 grid, pan the camera freely with WASD |
-| **Hover Preview** | Ghost piece preview before committing a move |
-| **Move Highlight** | Last move highlighted with a green border |
-| **Win Animation** | Winning line highlighted and struck through in gold |
-| **Win/Loss Overlay** | Full-screen cinematic overlay — confetti on win, clean card on loss |
-| **Undo** | Take back the last move (2 moves at once when vs AI) |
-| **Restart / Main Menu** | Reset the game or return to mode selection at any time |
+| **Title screen** | Pick a mode; when playing the computer, pick X or O |
+| **Play vs computer** | A greedy heuristic opponent; you may open (X) or move second (O) |
+| **Two players** | Hotseat on one machine, X and O alternating correctly |
+| **Large board** | 50x50 grid; pan the camera with WASD |
+| **Hover preview** | A ghost stone shows where the next move lands |
+| **Last-move marker** | The most recent stone is tinted and outlined |
+| **Win highlight** | The five winning stones flash, joined by a drawn line |
+| **Result card** | Win or loss, with Play Again (`R`) and Main Menu (`Esc`) |
+| **Undo** | Takes back your last move plus every reply the computer made after it |
+| **Restart / Main menu** | Start over or return to the title screen at any time |
 
 ---
 
-## Prerequisites
+## Requirements
 
-Before running the project, ensure your machine has the following installed:
-
-| Tool | Minimum Version | Purpose |
+| Tool | Minimum | Why |
 |---|---|---|
-| **JDK** (Java Development Kit) | 11 | Compile and run the application |
-| **Git** | Any | Clone the repository |
+| **JDK** | 21 | Compiling and running (the code uses records) |
+| **Maven** | 3.8+ | Build, dependencies, packaging |
+| **Git** | any | Cloning the repository |
 
-> **Note:** You only need a JDK — no build tools (Maven, Gradle) or external libraries are required. This project uses only the Java standard library.
+> Maven downloads JUnit 5 and AssertJ (test scope only) on the first build, so that build needs a network connection.
 
 ---
 
-## Environment Setup
+## Installing the toolchain
 
-### Verify Existing Installation
-
-Open a terminal and run:
+Check first — open a terminal and run:
 
 ```bash
 java -version
-javac -version
+mvn -version
 ```
 
-If both commands return version 11 or higher, skip to [Running the Project](#running-the-project).
-
----
+If `java` reports 21 or newer and `mvn` runs, skip ahead to [Running the game](#running-the-game).
 
 ### Windows
 
-#### — Using winget (Windows 10/11)
+Install JDK 21 with winget (bundled with Windows 10/11):
 
 ```powershell
-# Install Microsoft OpenJDK 21 (LTS)
 winget install Microsoft.OpenJDK.21
 ```
 
-Restart your terminal after installation.
+For Maven, the most reliable route is the official zip plus a PATH entry:
 
+1. Download the *Binary zip archive* from https://maven.apache.org/download.cgi
+2. Unzip it, for example to `C:\Program Files\Apache\maven`
+3. Set the environment variables (PowerShell as Administrator):
+   ```powershell
+   setx JAVA_HOME "C:\Program Files\Microsoft\jdk-21"
+   setx MAVEN_HOME "C:\Program Files\Apache\maven"
+   setx PATH "%PATH%;%MAVEN_HOME%\bin"
+   ```
+4. Open a new terminal and check: `mvn -version`
 
-```cmd
+> With **Chocolatey** installed, `choco install maven` replaces the Maven steps.
+
+### macOS
+
+Using **Homebrew**:
+
+```bash
+brew install openjdk@21
+
+sudo ln -sfn $(brew --prefix openjdk@21)/libexec/openjdk.jdk \
+  /Library/Java/JavaVirtualMachines/openjdk-21.jdk
+
+brew install maven
+
 java -version
-javac -version
+mvn -version
 ```
 
-#### Set JAVA_HOME manually (if needed)
-
-```cmd
-# Replace the path with your actual JDK location
-setx JAVA_HOME "C:\Program Files\Eclipse Adoptium\jdk-21"
-setx PATH "%PATH%;%JAVA_HOME%\bin"
-```
-
----
+If you do not have Homebrew yet, install it from https://brew.sh
 
 ### Linux
 
-#### Ubuntu / Debian
+**Ubuntu / Debian:**
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-21-jdk
-
-# Verify
-java -version
-javac -version
+sudo apt install -y openjdk-21-jdk maven
 ```
 
-#### Set JAVA_HOME on Linux (if needed)
+**Fedora:**
 
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
-export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
-export PATH=$JAVA_HOME/bin:$PATH
-
-# Reload shell
-source ~/.bashrc
+sudo dnf install -y java-21-openjdk-devel maven
 ```
 
----
-
-## Running the Project
-
-### Clone the Repository
+**Arch Linux:**
 
 ```bash
-git clone https://github.com/ToanNB1204/CaroAI.git
-cd caro-game
+sudo pacman -S jdk21-openjdk maven
 ```
 
----
-
-### Command Line
-
-This is the simplest method and works on all operating systems.
-
-```bash
-# Step 1 — Navigate to the source root
-cd src
-
-# Step 2 — Compile all Java files
-javac scr/*.java
-
-# Step 3 — Run the game
-java scr.Main
-```
-
-The game window will open immediately.
-
-> **Windows users:** Use Command Prompt or PowerShell. If using PowerShell and the wildcard `*.java` doesn't work, run:
-> ```powershell
-> javac (Get-ChildItem scr\*.java | % { $_.FullName })
-> java scr.Main
+> If your distribution has no JDK 21 package, [SDKMAN!](https://sdkman.io/) works everywhere:
+> ```bash
+> curl -s "https://get.sdkman.io" | bash
+> source "$HOME/.sdkman/bin/sdkman-init.sh"
+> sdk install java 21-open
+> sdk install maven
 > ```
 
 ---
 
-## How to Play
+## Running the game
 
-### Start Menu
+### Clone
 
-1. Select a game mode:
-   - **vs AI** — play against the computer
-   - **2 Players** — play against a friend on the same machine
-2. If playing vs AI, choose your symbol:
-   - **X** — you go first
-   - **O** — AI goes first
-3. Click **▶ START**
+```bash
+git clone https://github.com/ToanNB1204/CaroAI.git
+cd CaroAI
+```
 
-### In-Game Controls
+### Option 1 — Maven (recommended)
 
-| Action | Input |
-|---|---|
-| Place a piece | Left-click an empty cell |
-| Pan the camera | `W` `A` `S` `D` |
-| Undo last move | **Undo** button (sidebar) |
-| Restart the game | **Restart** button (sidebar) |
-| Quit | **Exit** button (sidebar) |
+```bash
+mvn clean package
+java -jar target/caroai.jar
+```
 
-> **Tip:** Click once on the board area after the game starts to give it keyboard focus for WASD panning to work.
+`mvn clean package` compiles, runs the tests and produces a single runnable jar at `target/caroai.jar`. The same two commands work on Windows, macOS and Linux.
 
-### Win / Loss Screen
+### Option 2 — javac, no Maven
 
-| Action | Input |
-|---|---|
-| Play Again | Click **Play Again** or press `R` |
-| Return to Main Menu | Click **Main Menu** or press `Esc` |
+```bash
+javac -d out $(find src/main/java -name "*.java")
+java -cp out caroai.Main
+```
+
+> **PowerShell (Windows):**
+> ```powershell
+> javac -d out (Get-ChildItem -Recurse src\main\java -Filter *.java | % { $_.FullName })
+> java -cp out caroai.Main
+> ```
 
 ---
 
-## Project Structure
+## How to play
+
+### Title screen
+
+1. Choose a mode:
+   - **Play vs Computer**
+   - **Two Players** — hotseat on one machine
+2. Against the computer, choose your side:
+   - **X** — you open
+   - **O** — the computer opens
+3. Press **START**
+
+The mode defaults to *Play vs Computer*, so pressing START straight away starts a valid game.
+
+### In-game controls
+
+| Action | Input |
+|---|---|
+| Place a stone | Left-click an empty square |
+| Pan the board | `W` `A` `S` `D` |
+| Undo | **Undo** in the side rail |
+| Restart | **New Game** in the side rail |
+| Back to the title screen | **Main Menu** in the side rail |
+| Quit | **Exit** in the side rail |
+
+> Click once on the board after entering a game so it takes keyboard focus; WASD does nothing until it does.
+
+### Result card
+
+| Action | Input |
+|---|---|
+| Play again | **PLAY AGAIN** or `R` |
+| Main menu | **Main Menu** or `Esc` |
+
+---
+
+## Project structure
 
 ```
-caro-game/
+CaroAI/
+├── pom.xml                          # Maven config (Java 21, JUnit 5, AssertJ, JaCoCo)
+├── .gitignore
 ├── src/
-│   └── scr/
-│       ├── Main.java               # Entry point — launches GameFrame
-│       ├── GameFrame.java          # Main window — manages CardLayout and win overlay
-│       ├── StartMenuPanel.java     # Animated start screen with mode/symbol selection
-│       ├── MenuPanel.java          # In-game sidebar (turn badge, action buttons)
-│       ├── BoardPanel.java         # Board rendering, piece drawing, input handling
-│       ├── WinOverlayPanel.java    # Full-screen win/loss overlay with confetti
-│       ├── GameEngine.java         # Core logic — moves, win detection, turn switching
-│       ├── AI.java                 # Greedy heuristic AI engine
-│       ├── Player.java             # Player model (name, symbol, isAI)
-│       ├── Move.java               # Move record (point + player)
-│       ├── Board.java              # (Legacy) early JButton board prototype
-│       └── Menu.java               # (Legacy) early JMenuBar prototype
-├── assets/                         # Images and icons (if any)
-├── screenshots/                    # Screenshots for README
+│   ├── main/java/caroai/
+│   │   ├── Main.java                # Entry point — opens GameFrame
+│   │   ├── GameFrame.java           # Main window — CardLayout, move history, undo
+│   │   ├── StartMenuPanel.java      # Title screen: mode and side selection
+│   │   ├── MenuPanel.java           # In-game side rail: turn card, actions, credit
+│   │   ├── BoardPanel.java          # Draws the board, handles mouse and keys
+│   │   ├── WinOverlayPanel.java     # Result card over a dimmed backdrop
+│   │   ├── GameEngine.java          # Rules: stones, bounds, turns, win detection
+│   │   ├── AI.java                  # Greedy heuristic opponent
+│   │   ├── Coord.java               # Board coordinate (record)
+│   │   ├── Player.java              # One side: name, symbol, human or AI
+│   │   ├── Move.java                # A move: coordinate + who played it
+│   │   ├── Theme.java               # Design system: palette, fonts, stone drawing
+│   │   ├── ClassicButton.java       # The one button style, three variants
+│   │   ├── Board.java               # (Legacy) first JButton-grid experiment
+│   │   └── Menu.java                # (Legacy) first JMenuBar experiment
+│   └── test/java/caroai/            # Unit tests (JUnit 5 + AssertJ)
+├── docs/screenshots/                # Screenshots for this README
 └── README.md
 ```
 
 ---
 
-## AI Algorithm
+## Design system
 
-The AI uses a **Greedy Heuristic** — no look-ahead tree. On each turn it scores every candidate cell and immediately plays the highest-scoring one.
+Everything visual is centralised in `Theme.java`: the palette, the font selection, and the routine that draws a stone. The board, the side rail and the result card all call the same `Theme.drawStone()`, so an X looks identical everywhere. Changing a constant in `Theme` re-tones the whole game.
 
-### Candidate Selection
+- **Board** — warm parchment with a faint checker, a light grid, go-style star points every six cells, and a dark wooden frame
+- **Stones** — X is black ink, O is vermilion; a classic pair that reads clearly on parchment
+- **Chrome** — dark wood-toned surfaces with a single green accent reserved for the primary action, and a muted gold for rules and dividers
+- **Type** — a serif display face for headings (Georgia → Cambria → Noto Serif, whichever the machine has), a sans face for everything else
+- **Buttons** — `ClassicButton`, one style in three variants, each with a solid bottom lip that the face sinks into when pressed
 
-Only empty cells with **at least one occupied neighbour** within 1 cell are considered. This filters out isolated empty cells and keeps the search fast on the large board.
+---
+
+## How the AI works
+
+The AI is a **greedy heuristic** with no look-ahead. Each turn it scores every candidate square and plays the highest.
+
+### Candidate squares
+
+Only empty squares with **at least one stone within one cell** are considered. This drops isolated squares and keeps the search fast on a large board.
 
 ### Scoring
 
-Each candidate is evaluated in **4 directions**: horizontal `→`, vertical `↓`, diagonal `↘`, anti-diagonal `↗`. The AI counts consecutive friendly and enemy pieces and assigns scores:
+Each candidate is evaluated along **four axes**: horizontal, vertical, and both diagonals. The AI counts its own run and the opponent's run through that square:
 
-| Sequence | AI attack | Player block |
+| Run length | Attack (its own) | Defence (blocking) |
 |---|---|---|
-| 5 in a row (win now) | 100,000 | 90,000 |
+| 5 in a row (immediate win) | 100,000 | 90,000 |
 | 4 in a row | 10,000 | 9,000 |
 | 3 in a row | 1,000 | 900 |
 | 2 in a row | 100 | 90 |
 
-The AI will **always win immediately** if it can (100,000), then **always block** a player about to win (90,000), then extend its own sequences.
+So it **always takes a win** when one exists (100,000), then **always blocks** an opponent about to win (90,000), and only then extends its own shapes.
+
+### Opening move
+
+On an empty board every candidate is isolated, so `getBestMove` returns `null`. `BoardPanel` handles that case by playing near the centre of the **visible window** rather than the centre of the 50x50 board — a stone at (25,25) would be off-screen and look like a frozen game.
+
+---
+
+## Architecture notes
+
+A few decisions that are worth knowing before changing the code.
+
+**One board, no copies.** `GameEngine` owns the position as a `Map<Coord, Cell>` and hands out a read-only view. The AI reads that map directly on every call. It used to keep its own `int[][]` mirror that the UI updated by hand after each move; a single missed or mis-ordered update silently flipped the meaning of a cell, and the AI would start playing for the other side. There is now nothing to synchronise.
+
+**Coordinates are a record.** `Coord(col, row)` replaces `java.awt.Point`. Point is mutable — a poor map key — and its `x`/`y` names never said which was the column. `Coord` is immutable, gets `equals`/`hashCode` from its components for free, and names its fields after what they are. There are no array indices left in the move path, so there is no out-of-bounds to hit.
+
+**Bounds live in the engine.** `GameEngine.makeMove()` rejects a null, off-board or occupied coordinate and returns `false` without changing anything. It is the single gate every move passes through, so no caller can push a bad coordinate deeper in.
+
+**Turn order is derived, not tracked.** X always opens, so whose turn it is follows from the number of moves played. `GameFrame` recomputes it from the history rather than assigning it case by case, which is also what makes undo work for any number of stones instead of a hard-coded two.
+
+**Pending AI moves are cancellable.** The AI plays on a one-shot `Timer`. Undo, restart and returning to the menu all cancel it first, so a move from the previous position can never land on the new one.
 
 ---
 
 ## Troubleshooting
 
-**The game window doesn't open**
-- Confirm `javac` and `java` are on your PATH: `java -version`
-- Make sure you compiled from inside the `src/` directory before running `java scr.Main`
+**The window does not open**
+- Check `java` and `mvn` are on PATH: `java -version`, `mvn -version`
+- With Maven, make sure `mvn clean package` succeeded before `java -jar target/caroai.jar`
 
-**`error: package scr does not exist`**
-- You must run `java scr.Main` from inside the `src/` directory, not from the project root
+**`error: package caroai does not exist`**
+- Compiling by hand, compile the whole tree at once as shown in [Option 2](#option-2--javac-no-maven)
 
 **`javac: command not found`**
-- You have a JRE installed but not a JDK — install a full JDK (see [Environment Setup](#environment-setup))
+- You have a JRE, not a full JDK — reinstall per [Installing the toolchain](#installing-the-toolchain)
 
-**Board doesn't respond to WASD**
-- Click once on the board area to give it keyboard focus
+**`mvn: command not found`**
+- Maven is not on PATH — recheck the install steps for your OS
 
-**Display looks blurry on high-DPI screens (Windows)**
-- Add the following JVM flag when running:
+**WASD does nothing**
+- Click once on the board so it takes keyboard focus
+
+**Blurry interface on a high-DPI display (Windows)**
+- Add a JVM flag:
   ```bash
-  java -Dsun.java2d.uiScale=1.0 scr.Main
+  java -Dsun.java2d.uiScale=1.0 -jar target/caroai.jar
   ```
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Run `mvn clean package` before opening a PR to confirm the build and tests still pass.
+
+## License
+
+MIT.
