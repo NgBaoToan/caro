@@ -355,7 +355,7 @@ Each level is a budget rather than a different algorithm, so an improvement to t
 |---|---|---|---|
 | Easy | 2 | 8 | 250 ms |
 | Medium | 4 | 12 | 700 ms |
-| Hard | 6 | 16 | 2000 ms |
+| Hard | 7 | 16 | 1350 ms |
 
 Easy also holds its answer back by about 200 ms. Without that it replies before your hand has left the mouse, which reads as a glitch rather than as a fast opponent.
 
@@ -466,3 +466,8 @@ Issues and pull requests are welcome. Run `mvn clean package` before opening a P
 ## License
 
 MIT.
+
+
+## AI optimization update
+
+Zobrist transposition caching, incremental evaluation and bounded four-threat search are enabled. HARD attempts seven plies with a 1350 ms budget. See [benchmark report](bench/REPORT.md).

@@ -1,0 +1,30 @@
+
+                                    Java Methods that Executes the Most
+
+Method                                                                                     Samples Percent
+------------------------------------------------------------------------------------------ ------- -------
+java.lang.runtime.ObjectMethods.eq(int, int)                                                   519  49.95%
+java.util.HashMap.getNode(Object)                                                              136  13.09%
+caroai.Evaluator.shapeThrough(Map, int, Coord, int[], GameEngine$Cell, int)                     76   7.31%
+java.util.HashMap.putVal(int, Object, Object, boolean, boolean)                                 69   6.64%
+java.util.Comparator.lambda$comparingInt$7b0bb60$1(ToIntFunction, Object, Object)               66   6.35%
+java.util.HashMap.resize()                                                                      30   2.89%
+java.util.HashMap.removeNode(int, Object, Object, boolean, boolean)                             21   2.02%
+caroai.Evaluator.runFrom(Map, int, Coord, int[], GameEngine$Cell, int)                          21   2.02%
+caroai.AI.neighbourhood(Map, int)                                                               17   1.64%
+caroai.Evaluator.rawScore(Map, int, GameEngine$Cell, int)                                       17   1.64%
+caroai.Evaluator.scoreAt(Map, int, Coord, GameEngine$Cell, int)                                 10   0.96%
+caroai.AI.shortlist(Map, int, GameEngine$Cell, GameEngine$Cell, int)                             7   0.67%
+java.util.HashMap$HashIterator.nextNode()                                                        7   0.67%
+java.lang.Integer.valueOf(int)                                                                   5   0.48%
+java.util.TimSort.mergeHi(int, int, int, int)                                                    5   0.48%
+java.util.HashSet.toArray()                                                                      5   0.48%
+java.util.TimSort.binarySort(Object[], int, int, int, Comparator)                                4   0.38%
+java.util.Comparator.lambda$thenComparing$36697e65$1(Comparator, Object, Object)                 3   0.29%
+java.util.LinkedHashMap.afterNodeAccess(HashMap$Node)                                            3   0.29%
+java.util.HashMap.hash(Object)                                                                   3   0.29%
+caroai.AI$$Lambda+0x000001b990016218.836220863.applyAsInt(Object)                                2   0.19%
+java.util.LinkedHashMap.afterNodeInsertion(boolean)                                              2   0.19%
+caroai.Coord.offset(int, int)                                                                    2   0.19%
+java.util.ArrayList.subList(int, int)                                                            1   0.10%
+caroai.Pattern.best(Pattern, Pattern)                                                            1   0.10%

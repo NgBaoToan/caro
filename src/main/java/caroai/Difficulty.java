@@ -16,7 +16,7 @@ public enum Difficulty {
 
     EASY  ("Easy",   2,  8,   250,  220),
     MEDIUM("Medium", 4, 12,   700,  120),
-    HARD  ("Hard",   6, 16,  2000,    0);
+    HARD  ("Hard",   7, 16,  1350,    0);
 
     private final String label;
     private final int    maxDepth;

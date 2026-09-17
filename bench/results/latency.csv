@@ -1,0 +1,14 @@
+case,stones,millis,completedDepth,legal
+cold-open,2,1350.102,6,true
+stress-0,12,1350.027,6,true
+stress-1,16,1350.130,6,true
+stress-2,20,1350.178,5,true
+stress-3,24,1350.051,5,true
+stress-4,28,219.065,4,true
+stress-5,32,1350.106,5,true
+stress-6,36,14.380,2,true
+stress-7,40,4.617,1,true
+stress-8,44,19.611,2,true
+stress-9,48,616.590,7,true
+stress-10,52,4.204,1,true
+stress-11,56,67.610,1,true

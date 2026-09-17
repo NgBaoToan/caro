@@ -1,0 +1,30 @@
+
+                                    Java Methods that Executes the Most
+
+Method                                                                                     Samples Percent
+------------------------------------------------------------------------------------------ ------- -------
+java.util.HashMap.getNode(Object)                                                              178  27.43%
+java.lang.invoke.LambdaForm$MH+0x0000019222014400.1664439369.guard(Object, Object, Object)     130  20.03%
+caroai.SearchState.updateWindow(int, int, int[], int)                                           55   8.47%
+java.util.BitSet.expandTo(int)                                                                  26   4.01%
+java.util.HashMap.hash(Object)                                                                  25   3.85%
+java.util.BitSet.recalculateWordsInUse()                                                        23   3.54%
+caroai.Evaluator.runFrom(Map, int, Coord, int[], GameEngine$Cell, int)                          22   3.39%
+caroai.Evaluator.shapeThrough(Map, int, Coord, int[], GameEngine$Cell, int)                     17   2.62%
+caroai.SearchState.invalidate(Coord)                                                            16   2.47%
+caroai.Coord.offset(int, int)                                                                   16   2.47%
+java.util.Comparator.lambda$comparingInt$7b0bb60$1(ToIntFunction, Object, Object)               15   2.31%
+caroai.Pattern.best(Pattern, Pattern)                                                           12   1.85%
+caroai.SearchState.updateNeighbours(Coord, int)                                                 12   1.85%
+java.util.HashMap.putVal(int, Object, Object, boolean, boolean)                                 11   1.69%
+caroai.SearchState.candidates(Runnable, boolean)                                                 8   1.23%
+java.util.HashMap.removeNode(int, Object, Object, boolean, boolean)                              7   1.08%
+caroai.AI.minimax(SearchState, int, int, int, int, boolean)                                      7   1.08%
+caroai.TranspositionTable.put(long, int, int, TranspositionTable$Bound, Coord)                   7   1.08%
+caroai.SearchState.updateWindows(Coord, int)                                                     5   0.77%
+caroai.AI$$Lambda+0x0000019222017d10.558216562.applyAsInt(Object)                                5   0.77%
+java.util.ArrayList.removeIf(Predicate, int, int)                                                5   0.77%
+java.util.Arrays.copyOf(Object[], int)                                                           5   0.77%
+caroai.SearchState.place(Coord, GameEngine$Cell)                                                 5   0.77%
+caroai.Evaluator.isFree(Map, int, Coord)                                                         4   0.62%
+java.util.HashMap.put(Object, Object)                                                            4   0.62%

@@ -12,7 +12,7 @@ import java.util.Set;
  * The computer opponent: minimax with alpha-beta pruning, driven by
  * {@link Evaluator} and bounded by {@link Difficulty}.
  *
- * Three things keep the search usable on a 50x50 board:
+ * Search features that keep the search usable on a 50x50 board:
  *
  *   Shortlisting — only empty squares within two cells of a stone are
  *   considered, and only the best few of those survive at each node. Anywhere
@@ -26,6 +26,11 @@ import java.util.Set;
  *   the time budget runs out. The move from the last depth that finished is
  *   the one played, so the AI always has an answer ready and never returns a
  *   half-searched one.
+ *
+ *   Incremental score, neighbourhood and threat-window updates live in SearchState.
+ *   Zobrist keys include the side to move; a bounded transposition table stores
+ *   exact/lower/upper bounds. At the horizon a maximum of six forcing plies
+ *   resolves fours and mandatory replies without extending ordinary threes.
  *
  * The class holds no board of its own. {@link #findBestMove} takes a snapshot,
  * copies it, and works on the copy, which is what makes it safe to call from a
@@ -53,6 +58,19 @@ public final class AI {
 
     private long deadlineNanos;
     private long nodes;
+    private int completedDepth;
+    int completedScore;
+    boolean useTranspositions = true; // package scope for exact cached/uncached regression checks
+    private long ttHits, ttCutoffs, threatNodes;
+    private TranspositionTable table;
+    private int branchLimit;
+    private static final int THREAT_PLIES = 6;
+
+    public record SearchStats(long nodes, int completedDepth, long ttHits,
+                              long ttCutoffs, long threatNodes) {}
+    public SearchStats searchStats() {
+        return new SearchStats(nodes, completedDepth, ttHits, ttCutoffs, threatNodes);
+    }
 
     public AI(int size, int winLength) {
         this(size, winLength, Difficulty.MEDIUM);
@@ -93,14 +111,20 @@ public final class AI {
 
         cancelled = false;
         nodes     = 0;
+        completedDepth = 0;
+        completedScore = 0;
+        ttHits = ttCutoffs = threatNodes = 0;
+        Difficulty level = difficulty;
+        branchLimit = level.branchLimit();
+        deadlineNanos = System.nanoTime() + level.budgetMillis() * 1_000_000L;
+        table = new TranspositionTable(17);
 
         if (snapshot == null || snapshot.isEmpty() || me == null) return null;
 
         int limit = Math.min(size, boardSize);
+        if (limit <= 0) return null;
         Map<Coord, GameEngine.Cell> board = new HashMap<>(snapshot);
         GameEngine.Cell them = GameEngine.opponentOf(me);
-
-        Difficulty level = difficulty;
 
         // Tactics first. These two are not an optimisation — they are the
         // guarantee that the AI never misses a win it can take now, and never
@@ -115,7 +139,7 @@ public final class AI {
         if (roots.isEmpty()) return null;
 
         Coord best = roots.get(0);
-        deadlineNanos = System.nanoTime() + level.budgetMillis() * 1_000_000L;
+        SearchState state = new SearchState(board, limit, winLength, me);
 
         try {
             for (int depth = 1; depth <= level.maxDepth(); depth++) {
@@ -124,7 +148,8 @@ public final class AI {
                 int   alpha        = -INFINITY;
 
                 for (Coord c : roots) {
-                    int score = scoreRootMove(board, c, depth, me, them, limit, alpha);
+                    checkTime();
+                    int score = scoreRootMove(state, c, depth, alpha);
                     if (score > bestScore) {
                         bestScore   = score;
                         bestAtDepth = c;
@@ -136,6 +161,10 @@ public final class AI {
                 // way through, SearchStopped skips this line and the previous
                 // depth's move stands.
                 if (bestAtDepth != null) best = bestAtDepth;
+                completedDepth = depth;
+                completedScore = bestScore;
+                roots.remove(best);
+                roots.add(0, best);
 
                 // A forced win is found; searching deeper cannot improve on it.
                 if (bestScore >= WIN_SCORE - 1000) break;
@@ -149,79 +178,132 @@ public final class AI {
 
     // ── Search ───────────────────────────────────────────────
 
-    private int scoreRootMove(Map<Coord, GameEngine.Cell> board, Coord c, int depth,
-                              GameEngine.Cell me, GameEngine.Cell them,
-                              int limit, int alpha) {
-        board.put(c, me);
-        int score;
-        if (winsAt(board, c, me)) {
-            score = WIN_SCORE;
-        } else {
-            score = minimax(board, depth - 1, 1, alpha, INFINITY, false, me, them, limit);
-        }
-        board.remove(c);
-        return score;
+    private int scoreRootMove(SearchState state, Coord c, int depth, int alpha) {
+        state.place(c, state.me);
+        try {
+            return winsAt(state.board, c, state.me) ? WIN_SCORE
+                    : minimax(state, depth - 1, 1, alpha, INFINITY, false);
+        } finally { state.undo(); }
     }
 
-    /**
-     * Plain minimax with alpha-beta. Scores are always from {@code me}'s point
-     * of view, so a single evaluator serves both sides.
-     *
-     * {@code ply} shifts the value of a forced win so the AI prefers winning in
-     * two moves over winning in four, and losing later over losing sooner.
-     */
-    private int minimax(Map<Coord, GameEngine.Cell> board, int depth, int ply,
-                        int alpha, int beta, boolean maximizing,
-                        GameEngine.Cell me, GameEngine.Cell them, int limit) {
-
-        checkBudget();
-
+    private int minimax(SearchState state, int depth, int ply,
+                        int alpha, int beta, boolean maximizing) {
+        nodes++;
+        checkTime();
+        int originalAlpha = alpha, originalBeta = beta;
+        long key = state.key(maximizing);
+        TranspositionTable.Entry cached = useTranspositions ? table.get(key) : null;
+        if (cached != null) {
+            ttHits++;
+            if (cached.depth() >= depth) {
+                int score = fromTable(cached.score(), ply);
+                if (cached.bound() == TranspositionTable.Bound.EXACT) { ttCutoffs++; return score; }
+                if (cached.bound() == TranspositionTable.Bound.LOWER) alpha = Math.max(alpha, score);
+                else beta = Math.min(beta, score);
+                if (alpha >= beta) { ttCutoffs++; return score; }
+            }
+        }
         if (depth <= 0) {
-            return Evaluator.evaluate(board, limit, me, winLength);
+            int score = threats(state, THREAT_PLIES, ply, alpha, beta, maximizing);
+            TranspositionTable.Bound bound = score <= originalAlpha ? TranspositionTable.Bound.UPPER
+                    : score >= originalBeta ? TranspositionTable.Bound.LOWER : TranspositionTable.Bound.EXACT;
+            if (useTranspositions) table.put(key, 0, toTable(score, ply), bound, null);
+            return score;
         }
-
-        GameEngine.Cell mover = maximizing ? me : them;
-        GameEngine.Cell other = maximizing ? them : me;
-
-        List<Coord> moves = shortlist(board, limit, mover, other,
-                                      difficulty.branchLimit());
-        if (moves.isEmpty()) {
-            return Evaluator.evaluate(board, limit, me, winLength);
+        List<SearchState.Candidate> moves = ordered(state, maximizing, false);
+        if (moves.isEmpty()) return state.score();
+        if (cached != null && cached.move() != null) {
+            for (int i = 0; i < moves.size(); i++) if (moves.get(i).move().equals(cached.move())) {
+                moves.add(0, moves.remove(i)); break;
+            }
         }
-
         int best = maximizing ? -INFINITY : INFINITY;
-
-        for (Coord c : moves) {
-            board.put(c, mover);
-
+        Coord bestMove = null;
+        for (SearchState.Candidate candidate : moves) {
+            checkTime();
+            Coord c = candidate.move();
+            GameEngine.Cell mover = maximizing ? state.me : state.them;
+            state.place(c, mover);
             int score;
-            if (winsAt(board, c, mover)) {
-                score = maximizing ? (WIN_SCORE - ply) : -(WIN_SCORE - ply);
-            } else {
-                score = minimax(board, depth - 1, ply + 1, alpha, beta,
-                                !maximizing, me, them, limit);
-            }
+            try {
+                score = winsAt(state.board, c, mover)
+                        ? (maximizing ? WIN_SCORE - ply : -WIN_SCORE + ply)
+                        : minimax(state, depth - 1, ply + 1, alpha, beta, !maximizing);
+            } finally { state.undo(); }
+            if (bestMove == null || (maximizing ? score > best : score < best)) { best = score; bestMove = c; }
+            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);
+            if (alpha >= beta) break;
+        }
+        TranspositionTable.Bound bound = best <= originalAlpha ? TranspositionTable.Bound.UPPER
+                : best >= originalBeta ? TranspositionTable.Bound.LOWER : TranspositionTable.Bound.EXACT;
+        if (useTranspositions) table.put(key, depth, toTable(best, ply), bound, bestMove);
+        return best;
+    }
 
-            board.remove(c);
-
-            if (maximizing) {
-                if (score > best) best = score;
-                if (best > alpha) alpha = best;
-            } else {
-                if (score < best) best = score;
-                if (best < beta)  beta = best;
-            }
-            if (beta <= alpha) break;   // this branch cannot influence the result
+    /** Bounded four-threat quiescence: wins, mandatory blocks, or moves creating a four.
+     * Stand-pat is allowed only when the opponent has no immediate winning square.
+     * Quiet full-width search still happens above the horizon; this is not a complete
+     * all-threat proof solver (open-three combinations are deliberately excluded).
+     */
+    private int threats(SearchState state, int remaining, int ply,
+                        int alpha, int beta, boolean maximizing) {
+        checkTime();
+        threatNodes++;
+        if (remaining == 0) return state.score();
+        List<SearchState.Candidate> moves = ordered(state, maximizing, true);
+        if (moves.isEmpty()) return state.score();
+        boolean mustReply = moves.stream().anyMatch(c ->
+                (maximizing ? c.defence() : c.attack()) >= Pattern.FIVE.score());
+        int best = mustReply ? (maximizing ? -INFINITY : INFINITY) : state.score();
+        if (!mustReply) {
+            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);
+            if (alpha >= beta) return best;
+        }
+        for (SearchState.Candidate candidate : moves) {
+            checkTime();
+            Coord c = candidate.move();
+            GameEngine.Cell mover = maximizing ? state.me : state.them;
+            state.place(c, mover);
+            int score;
+            try {
+                score = winsAt(state.board, c, mover)
+                        ? (maximizing ? WIN_SCORE - ply : -WIN_SCORE + ply)
+                        : threats(state, remaining - 1, ply + 1, alpha, beta, !maximizing);
+            } finally { state.undo(); }
+            best = maximizing ? Math.max(best, score) : Math.min(best, score);
+            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);
+            if (alpha >= beta) break;
         }
         return best;
     }
 
-    /** Aborts the search once the budget is spent or a cancel has come in. */
-    private void checkBudget() {
-        if ((++nodes & 0x3FF) != 0) return;   // check every 1024 nodes
-        if (cancelled || System.nanoTime() > deadlineNanos) throw STOP;
+    private List<SearchState.Candidate> ordered(SearchState state, boolean maximizing, boolean forcingOnly) {
+        List<SearchState.Candidate> all = state.candidates(this::checkTime, forcingOnly && winLength == 5);
+        boolean hasWin = all.stream().anyMatch(c -> (maximizing ? c.attack() : c.defence()) >= Pattern.FIVE.score());
+        boolean hasBlock = all.stream().anyMatch(c -> (maximizing ? c.defence() : c.attack()) >= Pattern.FIVE.score());
+        all.removeIf(c -> {
+            int own = maximizing ? c.attack() : c.defence();
+            int enemy = maximizing ? c.defence() : c.attack();
+            if (hasWin) return own < Pattern.FIVE.score();
+            if (hasBlock) return enemy < Pattern.FIVE.score();
+            return forcingOnly && own < Pattern.FOUR.score();
+        });
+        all.sort(Comparator.comparingInt((SearchState.Candidate c) -> -c.rank(maximizing))
+                .thenComparingInt(c -> c.move().col()).thenComparingInt(c -> c.move().row()));
+        // Never discard a mandatory reply or a forcing move just because of the beam width.
+        return !forcingOnly && !hasWin && !hasBlock && all.size() > branchLimit
+                ? new ArrayList<>(all.subList(0, branchLimit)) : all;
     }
 
+    private static int toTable(int score, int ply) {
+        return score >= WIN_SCORE - 1000 ? score + ply : score <= -WIN_SCORE + 1000 ? score - ply : score;
+    }
+    private static int fromTable(int score, int ply) {
+        return score >= WIN_SCORE - 1000 ? score - ply : score <= -WIN_SCORE + 1000 ? score + ply : score;
+    }
+    private void checkTime() {
+        if (cancelled || Thread.currentThread().isInterrupted() || System.nanoTime() >= deadlineNanos) throw STOP;
+    }
     // ── Candidate moves ──────────────────────────────────────
 
     /**

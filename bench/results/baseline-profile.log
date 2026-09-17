@@ -1,0 +1,16 @@
+[0.342s][info][jfr,startup] Started recording 1. No limit specified, using maxsize=250MB as default.
+[0.342s][info][jfr,startup] 
+[0.342s][info][jfr,startup] Use jcmd 22532 JFR.dump name=1 to copy recording data to file.
+fixture,level,iteration,millis,nodes,completedDepth,col,row,ttHits,ttCutoffs,threatNodes
+0,HARD,0,336.282,39675,-1,25,24,-1,-1,-1
+0,HARD,1,332.588,39675,-1,25,24,-1,-1,-1
+0,HARD,2,326.237,39675,-1,25,24,-1,-1,-1
+1,HARD,0,444.913,22501,-1,26,24,-1,-1,-1
+1,HARD,1,819.282,22501,-1,26,24,-1,-1,-1
+1,HARD,2,799.274,22501,-1,26,24,-1,-1,-1
+2,HARD,0,739.850,8431,-1,26,26,-1,-1,-1
+2,HARD,1,797.823,8431,-1,26,26,-1,-1,-1
+2,HARD,2,770.608,8431,-1,26,26,-1,-1,-1
+3,HARD,0,2001.709,43008,-1,22,20,-1,-1,-1
+3,HARD,1,2008.446,38912,-1,22,20,-1,-1,-1
+3,HARD,2,2063.175,38912,-1,22,20,-1,-1,-1
