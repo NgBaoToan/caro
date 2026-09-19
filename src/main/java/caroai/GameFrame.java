@@ -48,7 +48,7 @@ public class GameFrame extends JFrame {
         getContentPane().setBackground(Theme.BG);
         rootPanel.setBackground(Theme.BG);
 
-        startMenuPanel = new StartMenuPanel(this::onStartGame);
+        startMenuPanel = new StartMenuPanel(this::onStartGame, () -> AppearanceSettings.show(this));
         gameContainer  = new JPanel(new BorderLayout());
         gameContainer.setBackground(Theme.BG);
 
@@ -161,7 +161,7 @@ public class GameFrame extends JFrame {
         removeOverlay();
         if (boardPanel != null) boardPanel.cancelPendingAI();
         rootPanel.remove(startMenuPanel);
-        startMenuPanel = new StartMenuPanel(this::onStartGame);
+        startMenuPanel = new StartMenuPanel(this::onStartGame, () -> AppearanceSettings.show(this));
         rootPanel.add(startMenuPanel, CARD_MENU);
         cardLayout.show(rootPanel, CARD_MENU);
     }
@@ -211,6 +211,19 @@ public class GameFrame extends JFrame {
 
     public void restartGame()        { startGame(); }
     public void recordMove(Coord c)  { history.push(c); }
+
+    /** Apply a palette without replacing the current game or cancelling its AI search. */
+    public void setAppearance(Theme.Mode mode) {
+        Theme.setMode(mode);
+        getContentPane().setBackground(Theme.BG);
+        rootPanel.setBackground(Theme.BG);
+        gameContainer.setBackground(Theme.BG);
+        startMenuPanel.refreshAppearance();
+        if (menuPanel != null) menuPanel.refreshAppearance();
+        if (boardPanel != null) boardPanel.setBackground(Theme.BOARD_BG);
+        SwingUtilities.updateComponentTreeUI(this);
+        repaint();
+    }
 
     /** Difficulty of the game in progress, shown in the side rail. */
     public Difficulty getDifficulty() { return vsAI ? difficulty : null; }

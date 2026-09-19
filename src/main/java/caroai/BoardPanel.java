@@ -161,8 +161,8 @@ public class BoardPanel extends JPanel {
                 long started = System.currentTimeMillis();
                 Coord found = ai.findBestMove(snapshot, mine, limit);
 
-                // A move played back instantly reads as a glitch rather than as
-                // a fast opponent, so hold the easy levels back a little.
+                // Keep only a brief pause so quick searches remain perceptible
+                // without making the opponent feel unresponsive.
                 long elapsed = System.currentTimeMillis() - started;
                 if (elapsed < floor) {
                     try { Thread.sleep(floor - elapsed); }
@@ -328,7 +328,7 @@ public class BoardPanel extends JPanel {
         int w = getWidth(), h = getHeight();
         int size = engine.getSize();
 
-        // ── Parchment surface ────────────────────────────────
+        // ── Theme-colored board surface ──────────────────────
         g2.setColor(Theme.BOARD_BG);
         g2.fillRect(0, 0, w, h);
 
@@ -419,7 +419,7 @@ public class BoardPanel extends JPanel {
                         cellSize - 2, cellSize - 2);
         }
 
-        // ── Dark wooden frame around the surface ─────────────
+        // ── Subtle frame around the surface ──────────────────
         g2.setStroke(new BasicStroke(1f));
         g2.setColor(Theme.alpha(Theme.BOARD_FRAME, 120));
         g2.drawRect(0, 0, w - 1, h - 1);

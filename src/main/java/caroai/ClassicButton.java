@@ -24,7 +24,7 @@ public class ClassicButton extends JComponent {
     private static final int ARC      = 8;
     private static final int EDGE     = 4;   // height of the bottom lip
 
-    private final String label;
+    private String label;
     private final String icon;        // may be null
     private final Kind   kind;
 
@@ -79,6 +79,8 @@ public class ClassicButton extends JComponent {
 
     public void setFontSize(int size) { this.fontSize = size; repaint(); }
 
+    public void setLabel(String label) { this.label = label; repaint(); }
+
     public void setFixedSize(int w, int h) {
         Dimension d = new Dimension(w, h);
         setPreferredSize(d);
@@ -99,11 +101,11 @@ public class ClassicButton extends JComponent {
             case PRIMARY:
                 face = Theme.mix(Theme.ACCENT, Theme.ACCENT_HOVER, hoverAnim);
                 edge = Theme.ACCENT_DARK;
-                text = new Color(0xF6, 0xFA, 0xF0);
+                text = Theme.mode() == Theme.Mode.DARK ? Theme.BG : Color.WHITE;
                 break;
             case SECONDARY:
                 face = Theme.mix(Theme.SURFACE_2, Theme.SURFACE_3, hoverAnim);
-                edge = new Color(0x26, 0x24, 0x21);
+                edge = Theme.BORDER;
                 text = Theme.mix(Theme.TEXT_DIM, Theme.TEXT, hoverAnim);
                 break;
             default: // QUIET

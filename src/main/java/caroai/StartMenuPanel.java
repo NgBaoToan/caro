@@ -24,17 +24,19 @@ public class StartMenuPanel extends JPanel {
     private int selectedLevel  = 1;
 
     private final Runnable onStart;
+    private final Runnable onSettings;
 
     private final ModeCard      cardAI, cardHuman;
     private final SymbolTile    tileX, tileO;
     private final LevelTile[]   levelTiles;
     private final JLabel        labelMode, labelSymbol, labelLevel, labelHint;
-    private final ClassicButton startBtn, exitBtn;
+    private final ClassicButton startBtn, settingsBtn, exitBtn;
 
     private int titleBaseline = 160;   // recomputed in layoutUI()
 
-    public StartMenuPanel(Runnable onStart) {
+    public StartMenuPanel(Runnable onStart, Runnable onSettings) {
         this.onStart = onStart;
+        this.onSettings = onSettings;
         setLayout(null);
         setBackground(Theme.BG);
 
@@ -60,6 +62,9 @@ public class StartMenuPanel extends JPanel {
         startBtn.setFontSize(15);
         startBtn.addActionListener(e -> onStart.run());
 
+        settingsBtn = new ClassicButton("Theme: " + Theme.mode().name(), ClassicButton.Kind.QUIET);
+        settingsBtn.addActionListener(e -> this.onSettings.run());
+
         exitBtn = new ClassicButton("Exit", ClassicButton.Kind.QUIET);
         exitBtn.addActionListener(e -> System.exit(0));
 
@@ -73,6 +78,7 @@ public class StartMenuPanel extends JPanel {
         add(labelLevel);
         for (LevelTile lt : levelTiles) add(lt);
         add(startBtn);
+        add(settingsBtn);
         add(exitBtn);
 
         addComponentListener(new ComponentAdapter() {
@@ -137,7 +143,8 @@ public class StartMenuPanel extends JPanel {
         startBtn.setBounds(cx - 110, y, 220, 52);
         y += 52 + 16;
 
-        exitBtn.setBounds(cx - 60, y, 120, 40);
+        settingsBtn.setBounds(cx - 125, y, 120, 40);
+        exitBtn.setBounds(cx + 5, y, 120, 40);
 
         revalidate();
         repaint();
@@ -151,6 +158,16 @@ public class StartMenuPanel extends JPanel {
         tileO.setVisible(vsAI);
         labelLevel.setVisible(vsAI);
         for (LevelTile lt : levelTiles) lt.setVisible(vsAI);
+    }
+
+    void refreshAppearance() {
+        setBackground(Theme.BG);
+        labelMode.setForeground(Theme.TEXT_FAINT);
+        labelSymbol.setForeground(Theme.TEXT_FAINT);
+        labelLevel.setForeground(Theme.TEXT_FAINT);
+        labelHint.setForeground(Theme.TEXT_FAINT);
+        settingsBtn.setLabel("Theme: " + Theme.mode().name());
+        repaint();
     }
 
     // ── Read by GameFrame ────────────────────────────────────
@@ -178,16 +195,19 @@ public class StartMenuPanel extends JPanel {
         g2.fillRect(0, 0, W, H);
 
         // Very faint board grid as wallpaper
-        g2.setColor(new Color(255, 255, 255, 6));
+        g2.setColor(Theme.alpha(Theme.TEXT, 6));
         for (int x = 0; x < W; x += 44) g2.drawLine(x, 0, x, H);
         for (int y = 0; y < H; y += 44) g2.drawLine(0, y, W, y);
 
-        // Darken towards the edges to pull the eye to the centre
+        // A restrained vignette gives the title area depth in either palette.
         g2.setPaint(new RadialGradientPaint(
             new Point(W / 2, H / 2),
             Math.max(W, H) * 0.72f,
             new float[] { 0f, 1f },
-            new Color[] { new Color(0, 0, 0, 0), new Color(0, 0, 0, 150) }
+            new Color[] { new Color(0, 0, 0, 0),
+                          Theme.mode() == Theme.Mode.DARK
+                              ? new Color(0, 0, 0, 90)
+                              : new Color(65, 46, 20, 22) }
         ));
         g2.fillRect(0, 0, W, H);
 

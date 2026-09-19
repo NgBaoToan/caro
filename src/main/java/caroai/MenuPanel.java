@@ -12,6 +12,7 @@ public class MenuPanel extends JPanel {
     private static final int WIDTH = 248;
 
     private final TurnCard turnCard;
+    private final ClassicButton settingsBtn;
     private final String   difficultyLabel;
 
     public MenuPanel(GameFrame frame) {
@@ -60,6 +61,13 @@ public class MenuPanel extends JPanel {
         add(menuBtn);
         y += 42 + 8;
 
+        settingsBtn = new ClassicButton("⚙", "Theme: " + Theme.mode().name(),
+                                                      ClassicButton.Kind.QUIET);
+        settingsBtn.setBounds(pad, y, contentW, 42);
+        settingsBtn.addActionListener(e -> AppearanceSettings.show(frame));
+        add(settingsBtn);
+        y += 42 + 8;
+
         ClassicButton exitBtn = new ClassicButton("\u2715", "Exit",
                                                   ClassicButton.Kind.QUIET);
         exitBtn.setBounds(pad, y, contentW, 42);
@@ -77,6 +85,12 @@ public class MenuPanel extends JPanel {
         turnCard.setThinking(thinking);
     }
 
+    public void refreshAppearance() {
+        setBackground(Theme.SURFACE);
+        settingsBtn.setLabel("Theme: " + Theme.mode().name());
+        repaint();
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
@@ -88,7 +102,7 @@ public class MenuPanel extends JPanel {
         g2.fillRect(0, 0, w, h);
 
         // Divider against the board
-        g2.setColor(new Color(0, 0, 0, 90));
+        g2.setColor(Theme.alpha(Theme.BORDER, 110));
         g2.fillRect(w - 2, 0, 2, h);
 
         int pad = 22;

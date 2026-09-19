@@ -47,8 +47,8 @@ Caro (Gomoku) is a two-player strategy game. Players take turns placing **X** an
 CaroAI implements that on the desktop with Java Swing. The goal was not only a game that works but one that feels considered, so the interface is custom-painted rather than left to Swing's default look-and-feel:
 
 - Every component is drawn by hand; no stock Swing look-and-feel
-- A parchment board in a dark wooden frame, with go-style star points
-- A dark control rail showing whose turn it is, live
+- Light parchment and dark slate board palettes, both with go-style star points
+- A matching control rail showing whose turn it is, live
 - A quiet result card when a game ends — fade in, slight rise, no confetti
 - A 50x50 board that pans under a smaller window, driven by WASD
 
@@ -87,6 +87,7 @@ To capture them: run the game, screenshot each state (`Win + Shift + S` on Windo
 | **Result card** | Win or loss, with Play Again (`R`) and Main Menu (`Esc`) |
 | **Undo** | Takes back your last move plus every reply the computer made after it |
 | **Restart / Main menu** | Start over or return to the title screen at any time |
+| **Appearance settings** | Switch between Light and Dark from the title screen or game rail; the choice is saved for the next launch |
 
 ---
 
@@ -230,6 +231,8 @@ java -cp out caroai.Main
 3. Choose a difficulty: **Easy**, **Medium** or **Hard** (Medium by default)
 4. Press **START**
 
+Use **Appearance** to choose Light or Dark before starting. The choice is saved across launches.
+
 The mode defaults to *Play vs Computer*, so pressing START straight away starts a valid game.
 
 ### In-game controls
@@ -241,6 +244,7 @@ The mode defaults to *Play vs Computer*, so pressing START straight away starts 
 | Undo | **Undo** in the side rail |
 | Restart | **New Game** in the side rail |
 | Back to the title screen | **Main Menu** in the side rail |
+| Change theme | **Appearance** in the side rail; the current game stays in progress |
 | Quit | **Exit** in the side rail |
 
 > Click once on the board after entering a game so it takes keyboard focus; WASD does nothing until it does.
@@ -294,11 +298,11 @@ CaroAI/
 
 ## Design system
 
-Everything visual is centralised in `Theme.java`: the palette, the font selection, and the routine that draws a stone. The board, the side rail and the result card all call the same `Theme.drawStone()`, so an X looks identical everywhere. Changing a constant in `Theme` re-tones the whole game.
+Everything visual is centralised in `Theme.java`: the two palettes, font selection, and the routine that draws a stone. The board, side rail and result card all call the same `Theme.drawStone()`, so an X looks identical everywhere.
 
-- **Board** — warm parchment with a faint checker, a light grid, go-style star points every six cells, and a dark wooden frame
-- **Stones** — X is black ink, O is vermilion; a classic pair that reads clearly on parchment
-- **Chrome** — dark wood-toned surfaces with a single green accent reserved for the primary action, and a muted gold for rules and dividers
+- **Board** — warm parchment in Light; deep slate in Dark; both have a faint checker and star points every six cells
+- **Stones** — black and vermilion in Light; off-white and coral in Dark
+- **Chrome** — matching surfaces, clear text contrast and one accent for primary actions
 - **Type** — a serif display face for headings (Georgia → Cambria → Noto Serif, whichever the machine has), a sans face for everything else
 - **Buttons** — `ClassicButton`, one style in three variants, each with a solid bottom lip that the face sinks into when pressed
 
@@ -355,9 +359,9 @@ Each level is a budget rather than a different algorithm, so an improvement to t
 |---|---|---|---|
 | Easy | 2 | 8 | 250 ms |
 | Medium | 4 | 12 | 700 ms |
-| Hard | 7 | 16 | 1350 ms |
+| Hard | 7 | 16 | 850 ms |
 
-Easy also holds its answer back by about 200 ms. Without that it replies before your hand has left the mouse, which reads as a glitch rather than as a fast opponent.
+Easy and Medium have short minimum response times of 70 ms and 40 ms respectively. Hard may stop at a shallower completed depth when its 850 ms budget expires; its maximum remains seven plies.
 
 ### Off the event thread
 
@@ -470,4 +474,4 @@ MIT.
 
 ## AI optimization update
 
-Zobrist transposition caching, incremental evaluation and bounded four-threat search are enabled. HARD attempts seven plies with a 1350 ms budget. See [benchmark report](bench/REPORT.md).
+Zobrist transposition caching, incremental evaluation and bounded four-threat search are enabled. HARD attempts seven plies with an 850 ms budget. The [benchmark report](bench/REPORT.md) records the earlier 1350 ms configuration and should not be read as a measurement of the current response time.

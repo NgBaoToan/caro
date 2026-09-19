@@ -5,52 +5,95 @@ import java.awt.geom.Ellipse2D;
 import java.awt.geom.RoundRectangle2D;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.prefs.Preferences;
 
 /**
  * The shared design system for the whole interface.
  *
- * The idea: a classic parchment board in a dark wooden frame, a dark control
- * rail, and one green accent reserved for the primary action.
- * Changing the constants in this file re-tones the entire game.
+ * Shared colors for the light parchment and dark slate appearances.
  */
 public final class Theme {
 
     private Theme() {}
 
-    // ── Backgrounds & surfaces (dark wood) ───────────────────
-    public static final Color BG         = new Color(0x26, 0x24, 0x21);
-    public static final Color SURFACE    = new Color(0x30, 0x2E, 0x2B);
-    public static final Color SURFACE_2  = new Color(0x3A, 0x38, 0x35);
-    public static final Color SURFACE_3  = new Color(0x46, 0x43, 0x3F);
-    public static final Color BORDER     = new Color(0x4A, 0x47, 0x43);
-    public static final Color BORDER_LT  = new Color(0x5C, 0x58, 0x53);
+    public enum Mode { DARK, LIGHT }
+    private static final Preferences PREFS = Preferences.userNodeForPackage(Theme.class);
+    private static Mode mode = "LIGHT".equals(PREFS.get("appearance", "DARK")) ? Mode.LIGHT : Mode.DARK;
+
+    public static Mode mode() { return mode; }
+
+    public static void setMode(Mode value) {
+        mode = java.util.Objects.requireNonNull(value);
+        applyPalette();
+        PREFS.put("appearance", value.name());
+    }
+
+    // ── Backgrounds & surfaces ───────────────────────────────
+    public static Color BG         = new Color(0x26, 0x24, 0x21);
+    public static Color SURFACE    = new Color(0x30, 0x2E, 0x2B);
+    public static Color SURFACE_2  = new Color(0x3A, 0x38, 0x35);
+    public static Color SURFACE_3  = new Color(0x46, 0x43, 0x3F);
+    public static Color BORDER     = new Color(0x4A, 0x47, 0x43);
+    public static Color BORDER_LT  = new Color(0x5C, 0x58, 0x53);
 
     // ── Text ─────────────────────────────────────────────────
-    public static final Color TEXT       = new Color(0xED, 0xEC, 0xEA);
-    public static final Color TEXT_DIM   = new Color(0xA8, 0xA3, 0x9C);
-    public static final Color TEXT_FAINT = new Color(0x7A, 0x75, 0x6E);
+    public static Color TEXT       = new Color(0xED, 0xEC, 0xEA);
+    public static Color TEXT_DIM   = new Color(0xA8, 0xA3, 0x9C);
+    public static Color TEXT_FAINT = new Color(0x7A, 0x75, 0x6E);
 
     // ── Accents ──────────────────────────────────────────────
-    public static final Color ACCENT       = new Color(0x81, 0xB6, 0x4C);
-    public static final Color ACCENT_HOVER = new Color(0x95, 0xC9, 0x5E);
-    public static final Color ACCENT_DARK  = new Color(0x5D, 0x87, 0x34);
-    public static final Color GOLD         = new Color(0xC8, 0xA2, 0x4A);
+    public static Color ACCENT       = new Color(0x81, 0xB6, 0x4C);
+    public static Color ACCENT_HOVER = new Color(0x95, 0xC9, 0x5E);
+    public static Color ACCENT_DARK  = new Color(0x5D, 0x87, 0x34);
+    public static Color GOLD         = new Color(0xC8, 0xA2, 0x4A);
 
-    // ── Board (parchment + ink) ──────────────────────────────
-    public static final Color BOARD_BG     = new Color(0xEB, 0xE6, 0xD3);
-    public static final Color BOARD_BG_ALT = new Color(0xE7, 0xE2, 0xCD);
-    public static final Color BOARD_LINE   = new Color(0xB4, 0xA8, 0x8C);
-    public static final Color BOARD_STAR   = new Color(0x8C, 0x7E, 0x62);
-    public static final Color BOARD_FRAME  = new Color(0x3B, 0x2F, 0x25);
+    // ── Board ────────────────────────────────────────────────
+    public static Color BOARD_BG     = new Color(0xEB, 0xE6, 0xD3);
+    public static Color BOARD_BG_ALT = new Color(0xE7, 0xE2, 0xCD);
+    public static Color BOARD_LINE   = new Color(0xB4, 0xA8, 0x8C);
+    public static Color BOARD_STAR   = new Color(0x8C, 0x7E, 0x62);
+    public static Color BOARD_FRAME  = new Color(0x3B, 0x2F, 0x25);
 
-    // ── Stones: classic black ink vs vermilion ───────────────
-    public static final Color STONE_X      = new Color(0x2E, 0x2B, 0x27);
-    public static final Color STONE_O      = new Color(0x8C, 0x3A, 0x32);
+    // ── Stones ───────────────────────────────────────────────
+    public static Color STONE_X      = new Color(0x2E, 0x2B, 0x27);
+    public static Color STONE_O      = new Color(0x8C, 0x3A, 0x32);
 
     // ── Board markers ────────────────────────────────────────
-    public static final Color LAST_MOVE    = new Color(0xF2, 0xDE, 0x76, 130);
-    public static final Color WIN_CELL     = new Color(0x81, 0xB6, 0x4C, 110);
-    public static final Color WIN_LINE     = new Color(0x5D, 0x87, 0x34);
+    public static Color LAST_MOVE    = new Color(0xF2, 0xDE, 0x76, 130);
+    public static Color WIN_CELL     = new Color(0x81, 0xB6, 0x4C, 110);
+    public static Color WIN_LINE     = new Color(0x5D, 0x87, 0x34);
+
+    static { applyPalette(); }
+
+    private static void applyPalette() {
+        if (mode == Mode.DARK) {
+            BG = new Color(0x0B1220); SURFACE = new Color(0x111B2B);
+            SURFACE_2 = new Color(0x1B293A); SURFACE_3 = new Color(0x24364A);
+            BORDER = new Color(0x31445A); BORDER_LT = new Color(0x4B6279);
+            TEXT = new Color(0xF1F5FA); TEXT_DIM = new Color(0xB1C0CF);
+            TEXT_FAINT = new Color(0x8EA2B8);
+            ACCENT = new Color(0x40D4B0); ACCENT_HOVER = new Color(0x63E5C6);
+            ACCENT_DARK = new Color(0x239E80); GOLD = new Color(0xD9B873);
+            BOARD_BG = new Color(0x141F2E); BOARD_BG_ALT = new Color(0x172435);
+            BOARD_LINE = new Color(0x40546A); BOARD_STAR = new Color(0x647C92);
+            BOARD_FRAME = new Color(0x0D1725); STONE_X = new Color(0xF1F5FA);
+            STONE_O = new Color(0xF59C81); LAST_MOVE = new Color(0x40, 0xD4, 0xB0, 70);
+            WIN_CELL = new Color(0xD9, 0xB8, 0x73, 85); WIN_LINE = new Color(0xD9B873);
+            return;
+        }
+        BG = new Color(0xF3F0E8); SURFACE = new Color(0xFFFCF5);
+        SURFACE_2 = new Color(0xEDE8DD); SURFACE_3 = new Color(0xE2DBCD);
+        BORDER = new Color(0xC4B9A7); BORDER_LT = new Color(0xA99B86);
+        TEXT = new Color(0x242A25); TEXT_DIM = new Color(0x4D574D);
+        TEXT_FAINT = new Color(0x5D685D);
+        ACCENT = new Color(0x3B7438); ACCENT_HOVER = new Color(0x4A8746);
+        ACCENT_DARK = new Color(0x285B29); GOLD = new Color(0x8A641F);
+        BOARD_BG = new Color(0xFFF9E9); BOARD_BG_ALT = new Color(0xF7EFDA);
+        BOARD_LINE = new Color(0xA99A7F); BOARD_STAR = new Color(0x76684F);
+        BOARD_FRAME = new Color(0x665B4C); STONE_X = new Color(0x242A25);
+        STONE_O = new Color(0x9A3E32); LAST_MOVE = new Color(0xDD, 0xAF, 0x38, 130);
+        WIN_CELL = new Color(0x6A, 0xB6, 0x48, 110); WIN_LINE = new Color(0x3B7438);
+    }
 
     // ── Font ─────────────────────────────────────────────────
     private static Set<String> families;
@@ -204,8 +247,7 @@ public final class Theme {
     }
 
     /**
-     * Draws a stone on a small parchment tile — used in the side rail and the
-     * result card, where a dark background would swallow the black X.
+     * Draws a stone on a board-colored tile in the side rail and result card.
      */
     public static void drawStoneTile(Graphics2D g2, boolean isX,
                                      int x, int y, int size) {

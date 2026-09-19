@@ -8,15 +8,14 @@ package caroai;
  * and more time as the level rises. That keeps the AI's style consistent and
  * means an improvement to {@link Evaluator} lifts all three at once.
  *
- * {@code minThinkMillis} is purely cosmetic: without it, EASY answers before
- * the player's hand has left the mouse, which reads as a bug rather than as a
- * fast opponent.
+ * {@code minThinkMillis} is a short visual pause; keep it below the time a
+ * player would perceive as lag when the search itself finishes quickly.
  */
 public enum Difficulty {
 
-    EASY  ("Easy",   2,  8,   250,  220),
-    MEDIUM("Medium", 4, 12,   700,  120),
-    HARD  ("Hard",   7, 16,  1350,    0);
+    EASY  ("Easy",   2,  8,   250,   70),
+    MEDIUM("Medium", 4, 12,   700,   40),
+    HARD  ("Hard",   7, 16,   850,    0);
 
     private final String label;
     private final int    maxDepth;
