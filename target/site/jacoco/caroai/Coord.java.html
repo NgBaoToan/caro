@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Coord.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">Coord.java</span></div><h1>Coord.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package caroai;</span>
+
+/**
+ * A board coordinate.
+ *
+ * This replaces {@link java.awt.Point}, which was borrowed from the graphics
+ * library and carried two problems:
+ *
+ *   1. Its {@code x}/{@code y} names do not say which one is the column and
+ *      which one is the row, so call sites kept swapping them.
+ *   2. It is mutable, yet it was used as a {@code HashMap} key. Mutating a key
+ *      after insertion silently corrupts the map.
+ *
+ * A record is immutable and generates {@code equals}/{@code hashCode} from its
+ * components, which is exactly what a map key needs. The field names
+ * {@code col}/{@code row} make the order impossible to get wrong.
+ */
+public record Coord(int col, int row) {
+
+    /** A coordinate offset by the given amount. */
+    public Coord offset(int dCol, int dRow) {
+<span class="fc" id="L22">        return new Coord(col + dCol, row + dRow);</span>
+    }
+
+    /** True when this coordinate lies inside a square board of {@code size}. */
+    public boolean isInside(int size) {
+<span class="fc bfc" id="L27" title="All 8 branches covered.">        return col &gt;= 0 &amp;&amp; row &gt;= 0 &amp;&amp; col &lt; size &amp;&amp; row &lt; size;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L32">        return &quot;(&quot; + col + &quot;,&quot; + row + &quot;)&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

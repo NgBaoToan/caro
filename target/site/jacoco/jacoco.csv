@@ -1,0 +1,62 @@
+GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
+CaroAI,caroai.web,WebGame,13,389,7,55,1,55,7,32,0,8
+CaroAI,caroai.web,WebServer,100,387,14,34,22,82,15,19,1,9
+CaroAI,caroai,StartMenuPanel.new ComponentAdapter() {...},10,0,0,0,2,0,2,0,2,0
+CaroAI,caroai,StartMenuPanel.SymbolTile,76,0,4,0,15,0,4,0,2,0
+CaroAI,caroai,StartMenuPanel.ModeCard.new MouseAdapter() {...},44,0,0,0,8,0,4,0,4,0
+CaroAI,caroai,Menu,215,0,14,0,49,0,12,0,5,0
+CaroAI,caroai,TranspositionTable.Bound,0,34,0,0,0,1,0,1,0,1
+CaroAI,caroai,StartMenuPanel,1000,0,26,0,160,0,26,0,13,0
+CaroAI,caroai,MoveHistory,4,103,1,15,1,17,2,16,1,9
+CaroAI,caroai,Theme.StoneStyle,0,59,0,0,0,4,0,3,0,3
+CaroAI,caroai,Evaluator,4,567,2,64,0,76,2,43,0,11
+CaroAI,caroai,WinOverlayPanel.new AbstractAction() {...},14,0,0,0,2,0,2,0,2,0
+CaroAI,caroai,MenuPanel.TurnCard,206,0,8,0,42,0,9,0,5,0
+CaroAI,caroai,Pattern,0,123,0,2,0,13,0,5,0,4
+CaroAI,caroai,WinOverlayPanel.new AbstractAction() {...},14,0,0,0,2,0,2,0,2,0
+CaroAI,caroai,GameFrame,608,0,46,0,133,0,42,0,19,0
+CaroAI,caroai,WinOverlayPanel.new ComponentAdapter() {...},10,0,0,0,2,0,2,0,2,0
+CaroAI,caroai,AI.SearchStats,0,18,0,0,0,1,0,1,0,1
+CaroAI,caroai,AdvantagePanel.new JComponent.AccessibleJComponent() {...},0,7,0,0,0,1,0,1,0,1
+CaroAI,caroai,TranspositionTable,0,73,0,10,0,9,0,9,0,4
+CaroAI,caroai,ClassicButton.new MouseAdapter() {...},81,0,14,0,10,0,12,0,5,0
+CaroAI,caroai,SearchState.Undo,0,15,0,0,0,1,0,1,0,1
+CaroAI,caroai,ClassicButton,480,0,19,0,86,0,20,0,10,0
+CaroAI,caroai,GameEngine.Cell,0,24,0,0,0,1,0,1,0,1
+CaroAI,caroai,GameFrame.new BoardPanel() {...},35,0,4,0,6,0,4,0,2,0
+CaroAI,caroai,ControlSurface,151,0,22,0,13,0,12,0,1,0
+CaroAI,caroai,AI.SearchStopped,0,7,0,0,0,1,0,1,0,1
+CaroAI,caroai,AppearanceSettings,95,497,0,14,19,62,3,16,3,9
+CaroAI,caroai,Board,161,0,10,0,24,0,7,0,2,0
+CaroAI,caroai,AppearanceSettings.new Icon() {...},39,6,0,0,5,1,3,1,3,1
+CaroAI,caroai,AppearanceSettings.new JButton() {...},43,7,8,0,8,1,5,1,1,1
+CaroAI,caroai,AdvantagePanel,149,136,4,18,18,23,5,10,1,3
+CaroAI,caroai,AppearanceSettings.new JToggleButton() {...},43,4,8,0,7,1,5,1,1,1
+CaroAI,caroai,TranspositionTable.Entry,0,18,0,0,0,1,0,1,0,1
+CaroAI,caroai,WinOverlayPanel,492,0,20,0,88,0,19,0,9,0
+CaroAI,caroai,ClassicButton.Kind,34,0,0,0,4,0,1,0,1,0
+CaroAI,caroai,PositionEvaluation,12,203,2,42,0,22,2,22,0,2
+CaroAI,caroai,SoundEffects,109,43,21,1,33,11,17,2,6,2
+CaroAI,caroai,BoardPanel.new SwingWorker() {...},55,136,10,10,4,14,10,3,0,3
+CaroAI,caroai,Player,18,24,0,2,5,7,5,4,5,3
+CaroAI,caroai,GameEngine,12,388,2,36,2,65,4,39,2,22
+CaroAI,caroai,AppearanceSettings.Preview,244,9,28,0,19,1,15,1,1,1
+CaroAI,caroai,StartMenuPanel.ModeCard,135,0,6,0,28,0,5,0,2,0
+CaroAI,caroai,Difficulty,3,81,0,0,1,15,1,6,1,6
+CaroAI,caroai,SearchState.Candidate,0,34,0,2,0,3,0,3,0,2
+CaroAI,caroai,Coord,6,39,0,8,1,3,1,7,1,3
+CaroAI,caroai,BoardPanel.new KeyAdapter() {...},84,9,5,0,13,1,5,1,1,1
+CaroAI,caroai,BoardPanel.new SwingWorker() {...},76,0,4,0,15,0,5,0,3,0
+CaroAI,caroai,BoardPanel.new MouseMotionAdapter() {...},27,6,4,0,4,1,3,1,1,1
+CaroAI,caroai,BoardPanel.new MouseAdapter() {...},8,22,1,1,1,4,2,2,1,2
+CaroAI,caroai,Main,10,0,0,0,3,0,3,0,3,0
+CaroAI,caroai,Theme,383,792,15,27,50,106,21,21,9,12
+CaroAI,caroai,BoardPanel,849,531,109,41,139,104,74,25,8,16
+CaroAI,caroai,StartMenuPanel.LevelTile,87,0,6,0,17,0,5,0,2,0
+CaroAI,caroai,StartMenuPanel.SymbolTile.new MouseAdapter() {...},40,0,0,0,7,0,4,0,4,0
+CaroAI,caroai,AI,44,1132,18,192,5,176,21,114,4,26
+CaroAI,caroai,MenuPanel,526,0,12,0,108,0,20,0,14,0
+CaroAI,caroai,Move,9,0,0,0,1,0,1,0,1,0
+CaroAI,caroai,Theme.Mode,0,24,0,0,0,1,0,1,0,1
+CaroAI,caroai,SearchState,5,1016,4,100,0,110,4,63,0,15
+CaroAI,caroai,StartMenuPanel.LevelTile.new MouseAdapter() {...},51,0,2,0,6,0,5,0,4,0

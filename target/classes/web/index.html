@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#203f36">
+  <title>CaroAI — Một nước đi, nhiều khả năng</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/game-file.js" defer></script>
+  <script src="/sound.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="CaroAI trang chủ"><span class="brand-mark">×<span>○</span></span>Caro<span>AI</span></a>
+    <span class="edition">BÀN CỜ CỦA BẠN · PHIÊN BẢN WEB</span>
+    <button class="text-button" id="help">Cách chơi <span aria-hidden="true">↗</span></button>
+  </header>
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">DỪNG MỘT NHỊP. NGHĨ MỘT NƯỚC.</p><h1>Một bàn cờ.<br class="mobile-break"> Vô vàn khả năng.</h1></div>
+      <p class="intro-note">Nối năm quân để chiến thắng.<br>Một ván ngắn, một thử thách mới.</p>
+    </section>
+    <div class="game-layout">
+      <section class="board-card" aria-label="Khu vực bàn cờ">
+        <div class="board-toolbar"><span><span class="live-dot"></span> <span id="mode-label">Đấu với máy</span></span><span class="board-size">50 × 50 Ô</span></div>
+        <section class="evaluation" aria-label="Đánh giá lợi thế thế cờ">
+          <div class="evaluation-labels"><strong id="eval-x">X · 50%</strong><span id="eval-status" role="status">Cân bằng</span><strong id="eval-o">O · 50%</strong></div>
+          <meter id="advantage" min="0" max="100" value="50" aria-label="Lợi thế ước tính của X" aria-describedby="eval-note">50%</meter>
+          <p id="eval-detail"></p><small id="eval-note">Lợi thế ước tính từ thế cờ, không phải xác suất thắng.</small>
+        </section>
+        <div class="canvas-wrap"><canvas id="board" tabindex="0" aria-label="Bàn cờ caro. Dùng phím mũi tên chọn ô, Enter đặt quân, WASD di chuyển bàn cờ."></canvas></div>
+        <div class="board-footer"><span id="position">TÂM BÀN CỜ</span><div class="camera-controls"><button id="zoom-out" aria-label="Thu nhỏ bàn cờ">−</button><button id="center" title="Về nước đi cuối">Về tâm</button><button id="zoom-in" aria-label="Phóng to bàn cờ">+</button></div></div>
+      </section>
+      <aside class="sidebar">
+        <section class="turn-card">
+          <p class="eyebrow">TRÊN BÀN CỜ</p>
+          <div class="turn-heading"><span id="turn-symbol" class="stone-symbol">×</span><div><h2 id="status" role="status" aria-live="polite">Đến lượt bạn</h2><p id="status-detail">Bạn cầm X · Đi trước</p></div></div>
+          <div class="player-row"><span><i class="x-mark">×</i> <span id="x-name">Bạn</span></span><span id="x-status">Đang đi</span></div>
+          <div class="player-row"><span><i class="o-mark">○</i> <span id="o-name">CaroAI</span></span><span id="o-status">Chờ lượt</span></div>
+          <div class="error-box" id="error" hidden><p id="error-message" role="alert"></p><button id="retry">Thử lại</button></div>
+        </section>
+        <section class="settings-card">
+          <div class="section-heading"><h2>Ván hiện tại</h2><span class="small-tag" id="difficulty-tag">VỪA</span></div>
+          <dl><div><dt>Chế độ</dt><dd id="mode-detail">Đấu với máy</dd></div><div><dt>Số nước đi</dt><dd id="move-count">00</dd></div><div><dt>AI vừa tính</dt><dd id="ai-time">—</dd></div></dl>
+          <button id="undo" class="secondary full">↶ &nbsp; Hoàn tác</button>
+          <button id="hint" class="secondary full">✧ &nbsp; Gợi ý nước đi</button>
+          <p id="hint-status" class="utility-message" role="status" aria-live="polite"></p>
+          <button id="new-game" class="primary full">Ván mới <span>↗</span></button>
+        </section>
+        <section class="settings-card tools-card">
+          <div class="section-heading"><h2>Giao diện của bạn</h2></div>
+          <button id="theme" class="secondary full" aria-pressed="true">Giao diện: Tối</button>
+          <label class="select-label" for="stone-style">Kiểu quân X / O</label>
+          <select id="stone-style"><option value="round">Bo tròn</option><option value="sharp">Góc cạnh</option><option value="neon">Neon</option><option value="badge">Huy hiệu</option></select>
+        </section>
+        <section class="settings-card tools-card">
+          <div class="section-heading"><h2>Lưu và tiếp tục</h2></div>
+          <div class="file-actions"><button id="save-game" class="secondary">Lưu ván</button><button id="open-game" class="secondary">Mở ván</button></div>
+          <button id="sound" class="secondary full" aria-pressed="true">Âm thanh: Bật</button>
+          <p id="file-status" class="utility-message" role="status" aria-live="polite">Lưu tệp để chơi tiếp trên thiết bị khác.</p>
+        </section>
+        <section class="note-card"><span class="note-icon">✳</span><div><h3>Chậm một nước, sâu một ý.</h3><p>Kéo để khám phá bàn cờ. Cuộn để phóng to. Năm quân liên tiếp theo bất kỳ hướng nào sẽ thắng.</p></div></section>
+      </aside>
+    </div>
+    <section class="history-strip"><span class="eyebrow">NƯỚC GẦN ĐÂY</span><div id="history">Bàn cờ đang chờ nước đi đầu tiên.</div></section>
+    <footer class="page-footer"><span>CAROAI <span class="footer-separator">/</span> Năm quân. Một chiến thắng.</span><span>Kéo bàn cờ · Cuộn để zoom · WASD để di chuyển</span></footer>
+  </main>
+  <dialog id="settings-dialog">
+    <form id="settings-form">
+      <div class="dialog-top"><span class="eyebrow">MỘT KHỞI ĐẦU MỚI</span><button type="button" class="close-button" id="close-settings" aria-label="Đóng">×</button></div>
+      <h2>Ván tiếp theo của bạn.</h2><p class="dialog-description">Chọn đối thủ và tìm nhịp chơi của mình.</p>
+      <fieldset><legend>Chế độ chơi</legend><div class="choices"><label><input type="radio" name="mode" value="ai" checked><span>Đấu với máy<small>Thử sức cùng CaroAI</small></span></label><label><input type="radio" name="mode" value="local"><span>Hai người<small>Trên cùng thiết bị</small></span></label></div></fieldset>
+      <fieldset id="side-options"><legend>Quân của bạn</legend><div class="choices"><label><input type="radio" name="human" value="X" checked><span>× &nbsp; Quân X<small>Bạn đi trước</small></span></label><label><input type="radio" name="human" value="O"><span>○ &nbsp; Quân O<small>Máy đi trước</small></span></label></div></fieldset>
+      <label class="select-label" id="difficulty-options">Độ khó<select name="difficulty"><option value="EASY">Dễ — Khởi động nhẹ nhàng</option><option value="MEDIUM" selected>Vừa — Một chút thử thách</option><option value="HARD">Khó — Nghĩ xa hơn một nước</option></select></label>
+      <p class="replace-note">Bắt đầu sẽ thay thế ván hiện tại.</p><button class="primary full" type="submit">Bắt đầu ván mới <span>→</span></button>
+    </form>
+  </dialog>
+  <dialog id="load-dialog"><form id="load-form">
+    <div class="dialog-top"><span class="eyebrow">CHƠI TIẾP VÁN ĐÃ LƯU</span><button type="button" class="close-button" id="close-load" aria-label="Đóng">×</button></div>
+    <h2>Trở lại bàn cờ.</h2><p>Chọn tệp JSON đã lưu từ CaroAI (tối đa 64 KB). Ván hợp lệ sẽ thay thế ván hiện tại. Bạn có thể lưu ván hiện tại trước khi mở.</p>
+    <label class="select-label">Tệp ván cờ<input id="game-file" type="file" accept=".json,application/json" required></label>
+    <p id="load-error" role="alert"></p><button type="submit" id="load-submit" class="primary full">Mở ván này <span>→</span></button>
+  </form></dialog>
+  <dialog id="help-dialog"><div class="dialog-top"><span class="eyebrow">LUẬT CHƠI</span><button class="close-button" id="close-help" aria-label="Đóng">×</button></div><h2>Năm quân là đủ.</h2><p>X đi trước. Hai bên lần lượt đặt quân vào ô trống. Nối từ năm quân theo hàng ngang, dọc hoặc chéo để thắng, kể cả khi hai đầu bị chặn.</p><ul><li>Bấm hoặc chạm một ô để đặt quân.</li><li>Kéo bằng chuột hoặc một ngón tay để di chuyển bàn cờ.</li><li>Cuộn chuột hoặc dùng nút + / − để thay đổi kích thước ô.</li><li>Dùng WASD để di chuyển; phím mũi tên chọn ô, Enter hoặc Space đặt quân.</li><li>Hoàn tác lấy lại nước của bạn và nước máy đáp lại. Có thể dùng ngay lúc máy đang tính.</li><li>Gợi ý khoanh ô nên đi, không tự đặt quân. Bạn có thể chọn nước khác.</li><li>Lưu ván tải tệp JSON xuống máy. Mở ván khôi phục quân, lượt đi, chế độ và độ khó. Nếu đến lượt máy, máy sẽ tiếp tục.</li><li>Nút Âm thanh bật/tắt hiệu ứng và ghi nhớ lựa chọn trên trình duyệt này.</li></ul><p>Chế độ hai người chơi luân phiên trên cùng thiết bị. Hãy lưu ván trước khi tải lại trang hoặc đóng trình duyệt.</p></dialog>
+</body>
+</html>

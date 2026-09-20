@@ -62,7 +62,7 @@ public class StartMenuPanel extends JPanel {
         startBtn.setFontSize(15);
         startBtn.addActionListener(e -> onStart.run());
 
-        settingsBtn = new ClassicButton("Theme: " + Theme.mode().name(), ClassicButton.Kind.QUIET);
+        settingsBtn = new ClassicButton("Appearance", ClassicButton.Kind.QUIET);
         settingsBtn.addActionListener(e -> this.onSettings.run());
 
         exitBtn = new ClassicButton("Exit", ClassicButton.Kind.QUIET);
@@ -166,7 +166,7 @@ public class StartMenuPanel extends JPanel {
         labelSymbol.setForeground(Theme.TEXT_FAINT);
         labelLevel.setForeground(Theme.TEXT_FAINT);
         labelHint.setForeground(Theme.TEXT_FAINT);
-        settingsBtn.setLabel("Theme: " + Theme.mode().name());
+        settingsBtn.setLabel("Appearance");
         repaint();
     }
 
@@ -194,10 +194,15 @@ public class StartMenuPanel extends JPanel {
         g2.setColor(Theme.BG);
         g2.fillRect(0, 0, W, H);
 
-        // Very faint board grid as wallpaper
-        g2.setColor(Theme.alpha(Theme.TEXT, 6));
-        for (int x = 0; x < W; x += 44) g2.drawLine(x, 0, x, H);
-        for (int y = 0; y < H; y += 44) g2.drawLine(0, y, W, y);
+        // Oversized abstract board shapes echo the slate dashboard style.
+        g2.setColor(Theme.alpha(Theme.BOARD_BG_ALT, 85));
+        g2.fillPolygon(new int[]{0,W/3,W},new int[]{H/3,0,H},3);
+        g2.setColor(Theme.alpha(Theme.SURFACE_3, 80));
+        g2.fillPolygon(new int[]{0,W/2,W},new int[]{H,H/2,0},3);
+        if (W > 850) {
+            Theme.drawStone(g2,true,W*.12,H*.28,85,.11f);
+            Theme.drawStone(g2,false,W*.85,H*.70,115,.12f);
+        }
 
         // A restrained vignette gives the title area depth in either palette.
         g2.setPaint(new RadialGradientPaint(
@@ -286,14 +291,7 @@ public class StartMenuPanel extends JPanel {
             int w = getWidth(), h = getHeight();
             boolean sel = (selectedMode == index);
 
-            g2.setColor(sel ? Theme.SURFACE_2
-                            : (hovered ? Theme.SURFACE_2 : Theme.SURFACE));
-            g2.fill(Theme.round(0, 0, w, h, 10));
-
-            g2.setStroke(new BasicStroke(sel ? 2f : 1f));
-            g2.setColor(sel ? Theme.ACCENT
-                            : (hovered ? Theme.BORDER_LT : Theme.BORDER));
-            g2.draw(Theme.round(1, 1, w - 2, h - 2, 10));
+            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));
 
             // Illustrate the mode with the game's own stones
             int tile = 34;
@@ -345,12 +343,7 @@ public class StartMenuPanel extends JPanel {
             int w = getWidth(), h = getHeight();
             boolean sel = (selectedSymbol == index);
 
-            g2.setColor(hovered ? Theme.SURFACE_2 : Theme.SURFACE);
-            g2.fill(Theme.round(0, 0, w, h, 10));
-
-            g2.setStroke(new BasicStroke(sel ? 2f : 1f));
-            g2.setColor(sel ? Theme.ACCENT : Theme.BORDER);
-            g2.draw(Theme.round(1, 1, w - 2, h - 2, 10));
+            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));
 
             int tile = w - 22;
             Theme.drawStoneTile(g2, index == 0, 11, (h - tile) / 2, tile);
@@ -388,12 +381,7 @@ public class StartMenuPanel extends JPanel {
             int w = getWidth(), h = getHeight();
             boolean sel = (selectedLevel == index);
 
-            g2.setColor(hovered ? Theme.SURFACE_2 : Theme.SURFACE);
-            g2.fill(Theme.round(0, 0, w, h, 8));
-
-            g2.setStroke(new BasicStroke(sel ? 2f : 1f));
-            g2.setColor(sel ? Theme.ACCENT : Theme.BORDER);
-            g2.draw(Theme.round(1, 1, w - 2, h - 2, 8));
+            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));
 
             g2.setFont(Theme.ui(sel ? Font.BOLD : Font.PLAIN, 12));
             g2.setColor(sel ? Theme.TEXT : Theme.TEXT_DIM);

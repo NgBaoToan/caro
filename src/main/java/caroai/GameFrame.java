@@ -110,13 +110,21 @@ public class GameFrame extends JFrame {
             @Override
             public void repaint() {
                 super.repaint();
-                if (menuPanel != null && engine != null)
+                if (menuPanel != null && engine != null) {
                     menuPanel.updateCurrentPlayer(engine.getCurrentPlayer().getSymbol());
+                    menuPanel.updateEvaluation(engine);
+                }
             }
         };
 
+        boardPanel.addPropertyChangeListener("hintStatus", e -> menuPanel.setHintStatus((String) e.getNewValue()));
         gameContainer.removeAll();
-        gameContainer.add(menuPanel,  BorderLayout.WEST);
+        JScrollPane rail = new JScrollPane(menuPanel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        rail.setBorder(null);
+        rail.setPreferredSize(new Dimension(266, 0));
+        rail.getVerticalScrollBar().setUnitIncrement(20);
+        gameContainer.add(rail, BorderLayout.WEST);
         gameContainer.add(boardPanel, BorderLayout.CENTER);
         gameContainer.revalidate();
         gameContainer.repaint();
@@ -210,10 +218,16 @@ public class GameFrame extends JFrame {
     }
 
     public void restartGame()        { startGame(); }
+    public void requestHint() { if (boardPanel != null) boardPanel.requestHint(); }
     public void recordMove(Coord c)  { history.push(c); }
 
     /** Apply a palette without replacing the current game or cancelling its AI search. */
     public void setAppearance(Theme.Mode mode) {
+        setAppearance(mode, Theme.stoneStyle());
+    }
+
+    public void setAppearance(Theme.Mode mode, Theme.StoneStyle style) {
+        Theme.setStoneStyle(style);
         Theme.setMode(mode);
         getContentPane().setBackground(Theme.BG);
         rootPanel.setBackground(Theme.BG);

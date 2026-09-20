@@ -20,6 +20,7 @@ public class BoardPanel extends JPanel {
 
     private final GameEngine engine;
     private final AI         ai;
+    private final Runnable moveSound;
 
     private final int cellSize = 40;
     private int offsetX = 0, offsetY = 0;   // top-left cell of the visible window
@@ -34,10 +35,78 @@ public class BoardPanel extends JPanel {
      * window. The worker is kept so it can be cancelled on undo or restart.
      */
     private SwingWorker<Coord, Void> aiWorker = null;
+    private SwingWorker<Coord, Void> hintWorker;
+    private AI hintAI;
+    private Coord hintMove;
+    private String hintStatus = "";
+
+    public String getHintStatus() { return hintStatus; }
+    Coord getHintMove() { return hintMove; }
+
+    private void setHintStatus(String text) {
+        String old = hintStatus; hintStatus = text;
+        firePropertyChange("hintStatus", old, text);
+    }
+
+    private void clearHint() {
+        if (hintAI != null) hintAI.cancelSearch();
+        if (hintWorker != null) hintWorker.cancel(true);
+        hintWorker = null; hintAI = null; hintMove = null;
+        setHintStatus("");
+    }
+
+    /** Suggests for the player whose turn it is, without changing the game. */
+    public void requestHint() {
+        if (gameOver || engine.getBoard().size() == engine.getSize() * engine.getSize()) {
+            setHintStatus("Ván cờ đã kết thúc."); return;
+        }
+        if (engine.getCurrentPlayer().isAI()) {
+            setHintStatus("Chờ máy đi xong nhé."); return;
+        }
+        if (hintWorker != null) return;
+        final Map<Coord, GameEngine.Cell> snapshot = new HashMap<>(engine.getBoard());
+        final GameEngine.Cell side = engine.getCurrentPlayer().cell();
+        final Coord opening = visibleCenterCell();
+        final AI advisor = new AI(engine.getSize(), GameEngine.WIN_LENGTH, Difficulty.HARD);
+        hintAI = advisor; hintMove = null;
+        setHintStatus("Đang tìm nước đi…"); repaint();
+        hintWorker = new SwingWorker<>() {
+            @Override protected Coord doInBackground() {
+                return snapshot.isEmpty() ? opening : advisor.findBestMove(snapshot, side, engine.getSize());
+            }
+            @Override protected void done() {
+                if (isCancelled() || hintWorker != this) return;
+                hintWorker = null; hintAI = null;
+                if (gameOver || engine.getCurrentPlayer().cell() != side || !snapshot.equals(engine.getBoard())) {
+                    setHintStatus(""); return;
+                }
+                try {
+                    Coord found = get();
+                    if (found == null || !engine.isInside(found) || engine.isOccupied(found)) {
+                        setHintStatus("Chưa tìm được gợi ý."); return;
+                    }
+                    hintMove = found;
+                    int cols = Math.max(1, getWidth() / cellSize), rows = Math.max(1, getHeight() / cellSize);
+                    if (!onScreen(found, getWidth(), getHeight())) {
+                        offsetX = Math.max(0, Math.min(engine.getSize()-cols, found.col()-cols/2));
+                        offsetY = Math.max(0, Math.min(engine.getSize()-rows, found.row()-rows/2));
+                    }
+                    setHintStatus("Cột " + (found.col()+1) + " · Hàng " + (found.row()+1));
+                } catch (Exception error) { setHintStatus("Không tính được. Hãy thử lại."); }
+                repaint();
+            }
+        };
+        hintWorker.execute();
+    }
 
     public BoardPanel(GameEngine engine, AI ai) {
+        this(engine, ai, SoundEffects::playMove);
+    }
+
+    BoardPanel(GameEngine engine, AI ai, Runnable moveSound) {
         this.engine = engine;
         this.ai     = ai;
+        this.moveSound = java.util.Objects.requireNonNull(moveSound);
         setPreferredSize(new Dimension(800, 800));
 
         // Hover preview
@@ -108,6 +177,8 @@ public class BoardPanel extends JPanel {
         // makeMove() rejects off-board and occupied cells, so an out-of-range
         // click simply does nothing instead of throwing mid-turn.
         if (!engine.makeMove(c, symbol)) return;
+        clearHint();
+        moveSound.run();
 
         lastMove = c;
         GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
@@ -200,6 +271,8 @@ public class BoardPanel extends JPanel {
         if (move == null) return;   // board is full
 
         if (!engine.makeMove(move, engine.getAISymbol())) return;
+        clearHint();
+        moveSound.run();
 
         lastMove = move;
         GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
@@ -217,6 +290,7 @@ public class BoardPanel extends JPanel {
 
     /** Cancels a running search (undo, restart, back to menu). */
     public void cancelPendingAI() {
+        clearHint();
         if (ai != null) ai.cancelSearch();
         if (aiWorker != null) {
             aiWorker.cancel(true);
@@ -285,11 +359,13 @@ public class BoardPanel extends JPanel {
 
     /** Allows play to continue after undoing a finished game. */
     public void clearGameOver() {
+        clearHint();
         gameOver    = false;
         winningLine = new ArrayList<>();
     }
 
     public void resetState() {
+        clearHint();
         gameOver    = false;
         lastMove    = null;
         winningLine = new ArrayList<>();
@@ -385,6 +461,15 @@ public class BoardPanel extends JPanel {
                 g2.drawLine(screenX(first) + cellSize / 2, screenY(first) + cellSize / 2,
                             screenX(last)  + cellSize / 2, screenY(last)  + cellSize / 2);
             }
+        }
+
+        if (hintMove != null && !gameOver && !engine.isOccupied(hintMove) && onScreen(hintMove, w, h)) {
+            int hx = screenX(hintMove), hy = screenY(hintMove);
+            g2.setColor(Theme.alpha(Theme.GOLD, 65));
+            g2.fillRect(hx+2,hy+2,cellSize-4,cellSize-4);
+            g2.setColor(Theme.GOLD);
+            g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 1, new float[]{5,3}, 0));
+            g2.drawOval(hx+5,hy+5,cellSize-10,cellSize-10);
         }
 
         // ── Hover preview ────────────────────────────────────

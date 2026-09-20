@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Menu.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">Menu.java</span></div><h1>Menu.java</h1><pre class="source lang-java linenums">package caroai;
+
+import javax.swing.*;
+import java.awt.*;
+
+/**
+ * Legacy prototype: the first JMenuBar experiment.
+ * Kept for reference only — the game starts from {@link Main}.
+ */
+<span class="nc" id="L10">public class Menu {</span>
+
+    public static void main(String[] args) {
+<span class="nc" id="L13">        int size = 15;</span>
+<span class="nc" id="L14">        JFrame frame = new JFrame(&quot;Caro&quot;);</span>
+<span class="nc" id="L15">        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);</span>
+<span class="nc" id="L16">        frame.setSize(600, 600);</span>
+
+<span class="nc" id="L18">        JMenuBar menuBar  = new JMenuBar();</span>
+<span class="nc" id="L19">        JMenu    menu     = new JMenu(&quot;Menu&quot;);</span>
+<span class="nc" id="L20">        JMenuItem settingItem = new JMenuItem(&quot;Settings&quot;);</span>
+<span class="nc" id="L21">        JMenuItem exitItem    = new JMenuItem(&quot;Exit&quot;);</span>
+
+<span class="nc" id="L23">        menu.add(settingItem);</span>
+<span class="nc" id="L24">        menu.add(exitItem);</span>
+<span class="nc" id="L25">        menuBar.add(menu);</span>
+<span class="nc" id="L26">        frame.setJMenuBar(menuBar);</span>
+
+<span class="nc" id="L28">        JPanel panel = new JPanel();</span>
+<span class="nc" id="L29">        panel.setLayout(new GridLayout(size, size));</span>
+
+<span class="nc" id="L31">        ImageIcon xIcon = new ImageIcon(&quot;x.png&quot;);</span>
+<span class="nc" id="L32">        ImageIcon oIcon = new ImageIcon(&quot;o.png&quot;);</span>
+
+<span class="nc" id="L34">        JButton[][] buttons = new JButton[size][size];</span>
+<span class="nc" id="L35">        boolean[] isXTurn = {true};</span>
+
+<span class="nc bnc" id="L37" title="All 2 branches missed.">        for (int i = 0; i &lt; size; i++) {</span>
+<span class="nc bnc" id="L38" title="All 2 branches missed.">            for (int j = 0; j &lt; size; j++) {</span>
+<span class="nc" id="L39">                buttons[i][j] = new JButton();</span>
+<span class="nc" id="L40">                int row = i, col = j;</span>
+<span class="nc" id="L41">                buttons[i][j].addActionListener(e -&gt; {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">                    if (buttons[row][col].getIcon() == null) {</span>
+<span class="nc bnc" id="L43" title="All 2 branches missed.">                        buttons[row][col].setIcon(isXTurn[0] ? xIcon : oIcon);</span>
+<span class="nc bnc" id="L44" title="All 2 branches missed.">                        isXTurn[0] = !isXTurn[0];</span>
+                    }
+<span class="nc" id="L46">                });</span>
+<span class="nc" id="L47">                panel.add(buttons[i][j]);</span>
+            }
+        }
+
+<span class="nc" id="L51">        settingItem.addActionListener(e -&gt; {</span>
+<span class="nc" id="L52">            String[] options = { &quot;Two players&quot;, &quot;Play vs computer&quot; };</span>
+<span class="nc" id="L53">            int choice = JOptionPane.showOptionDialog(</span>
+<span class="nc" id="L54">                frame,</span>
+<span class="nc" id="L55">                &quot;Choose a game mode:&quot;,</span>
+<span class="nc" id="L56">                &quot;Settings&quot;,</span>
+<span class="nc" id="L57">                JOptionPane.DEFAULT_OPTION,</span>
+<span class="nc" id="L58">                JOptionPane.QUESTION_MESSAGE,</span>
+<span class="nc" id="L59">                null,</span>
+<span class="nc" id="L60">                options,</span>
+<span class="nc" id="L61">                options[0]</span>
+            );
+<span class="nc bnc" id="L63" title="All 2 branches missed.">            if (choice == 0) {</span>
+<span class="nc" id="L64">                JOptionPane.showMessageDialog(frame, &quot;Two-player mode selected.&quot;);</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            } else if (choice == 1) {</span>
+<span class="nc" id="L66">                JOptionPane.showMessageDialog(frame, &quot;Play-vs-computer mode selected.&quot;);</span>
+            }
+<span class="nc" id="L68">        });</span>
+
+<span class="nc" id="L70">        exitItem.addActionListener(e -&gt; System.exit(0));</span>
+
+<span class="nc" id="L72">        frame.add(panel);</span>
+<span class="nc" id="L73">        frame.setVisible(true);</span>
+<span class="nc" id="L74">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

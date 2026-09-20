@@ -17,8 +17,27 @@ public final class Theme {
     private Theme() {}
 
     public enum Mode { DARK, LIGHT }
+    public enum StoneStyle {
+        ROUND("Bo tròn"), SHARP("Góc cạnh"), NEON("Neon"), BADGE("Huy hiệu");
+        private final String label;
+        StoneStyle(String label) { this.label = label; }
+        public String label() { return label; }
+    }
     private static final Preferences PREFS = Preferences.userNodeForPackage(Theme.class);
     private static Mode mode = "LIGHT".equals(PREFS.get("appearance", "DARK")) ? Mode.LIGHT : Mode.DARK;
+    private static StoneStyle stoneStyle = readStoneStyle();
+
+    private static StoneStyle readStoneStyle() {
+        try { return StoneStyle.valueOf(PREFS.get("stoneStyle", "ROUND")); }
+        catch (IllegalArgumentException e) { return StoneStyle.ROUND; }
+    }
+
+    public static StoneStyle stoneStyle() { return stoneStyle; }
+
+    public static void setStoneStyle(StoneStyle value) {
+        stoneStyle = java.util.Objects.requireNonNull(value);
+        PREFS.put("stoneStyle", value.name());
+    }
 
     public static Mode mode() { return mode; }
 
@@ -67,17 +86,17 @@ public final class Theme {
 
     private static void applyPalette() {
         if (mode == Mode.DARK) {
-            BG = new Color(0x0B1220); SURFACE = new Color(0x111B2B);
-            SURFACE_2 = new Color(0x1B293A); SURFACE_3 = new Color(0x24364A);
+            BG = new Color(0x1C222C); SURFACE = new Color(0x252D39);
+            SURFACE_2 = new Color(0x343F4E); SURFACE_3 = new Color(0x435163);
             BORDER = new Color(0x31445A); BORDER_LT = new Color(0x4B6279);
             TEXT = new Color(0xF1F5FA); TEXT_DIM = new Color(0xB1C0CF);
             TEXT_FAINT = new Color(0x8EA2B8);
-            ACCENT = new Color(0x40D4B0); ACCENT_HOVER = new Color(0x63E5C6);
-            ACCENT_DARK = new Color(0x239E80); GOLD = new Color(0xD9B873);
-            BOARD_BG = new Color(0x141F2E); BOARD_BG_ALT = new Color(0x172435);
-            BOARD_LINE = new Color(0x40546A); BOARD_STAR = new Color(0x647C92);
+            ACCENT = new Color(0x81B64C); ACCENT_HOVER = new Color(0x96C966);
+            ACCENT_DARK = new Color(0x547C30); GOLD = new Color(0xD9B873);
+            BOARD_BG = new Color(0x343F4E); BOARD_BG_ALT = new Color(0x48566A);
+            BOARD_LINE = new Color(0x66778B); BOARD_STAR = new Color(0x8DA0B4);
             BOARD_FRAME = new Color(0x0D1725); STONE_X = new Color(0xF1F5FA);
-            STONE_O = new Color(0xF59C81); LAST_MOVE = new Color(0x40, 0xD4, 0xB0, 70);
+            STONE_O = new Color(0xF4BB75); LAST_MOVE = new Color(0x81, 0xB6, 0x4C, 100);
             WIN_CELL = new Color(0xD9, 0xB8, 0x73, 85); WIN_LINE = new Color(0xD9B873);
             return;
         }
@@ -119,19 +138,14 @@ public final class Theme {
     private static final String[] UI_FONTS = {
         "Segoe UI", "Helvetica Neue", "Roboto", "Noto Sans", "DejaVu Sans", "Arial"
     };
-    private static final String[] DISPLAY_FONTS = {
-        "Georgia", "Palatino Linotype", "Book Antiqua", "Cambria",
-        "Noto Serif", "DejaVu Serif", "Times New Roman"
-    };
-
     /** Regular interface font (buttons, labels). */
     public static Font ui(int style, int size) {
         return pick(style, size, UI_FONTS, Font.SANS_SERIF);
     }
 
-    /** Serif display font for headings — the classic note. */
+    /** Strong sans-serif headings for the game dashboard. */
     public static Font display(int style, int size) {
-        return pick(style, size, DISPLAY_FONTS, Font.SERIF);
+        return pick(style, size, UI_FONTS, Font.SANS_SERIF);
     }
 
     // ── Drawing helpers ──────────────────────────────────────
@@ -203,47 +217,52 @@ public final class Theme {
      */
     public static void drawStone(Graphics2D g2, boolean isX,
                                  double cx, double cy, double r, float alpha) {
-        Composite old = g2.getComposite();
-        Stroke oldStroke = g2.getStroke();
-        if (alpha < 1f) {
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-        }
+        drawStone(g2, isX, cx, cy, r, alpha, stoneStyle, isX ? STONE_X : STONE_O);
+    }
 
-        Color color = isX ? STONE_X : STONE_O;
-
-        // A very light drop shadow gives the stone some depth
-        if (alpha >= 1f) {
-            g2.setColor(new Color(0, 0, 0, 28));
-            if (isX) {
-                double k = r * 0.60, sw = r * 0.40, off = r * 0.09;
-                g2.setStroke(new BasicStroke((float) sw, BasicStroke.CAP_ROUND,
-                                             BasicStroke.JOIN_ROUND));
-                g2.draw(new java.awt.geom.Line2D.Double(cx - k, cy - k + off,
-                                                        cx + k, cy + k + off));
-                g2.draw(new java.awt.geom.Line2D.Double(cx + k, cy - k + off,
-                                                        cx - k, cy + k + off));
-            } else {
-                double rr = r * 0.66, sw = r * 0.38, off = r * 0.09;
-                g2.setStroke(new BasicStroke((float) sw));
-                g2.draw(new Ellipse2D.Double(cx - rr, cy - rr + off, rr * 2, rr * 2));
+    /** Explicit style and ink let settings preview changes without altering preferences. */
+    public static void drawStone(Graphics2D graphics, boolean isX,
+                                 double cx, double cy, double r, float opacity,
+                                 StoneStyle style, Color ink) {
+        if (r <= 0 || opacity <= 0) return;
+        Graphics2D g = (Graphics2D) graphics.create();
+        try {
+            antialias(g);
+            g.setComposite(AlphaComposite.SrcOver.derive(Math.min(1f, opacity)));
+            if (style == StoneStyle.BADGE) {
+                g.setColor(new Color(0, 0, 0, 65));
+                g.fill(new Ellipse2D.Double(cx-r, cy-r+r*.12, r*2, r*2));
+                g.setPaint(new GradientPaint((float)cx, (float)(cy-r), mix(ink, Color.WHITE, .3f),
+                        (float)cx, (float)(cy+r), ink.darker()));
+                g.fill(new Ellipse2D.Double(cx-r, cy-r, r*2, r*2));
+                g.setColor(alpha(Color.WHITE, 100));
+                g.setStroke(new BasicStroke((float)Math.max(1, r*.07)));
+                g.draw(new Ellipse2D.Double(cx-r*.84, cy-r*.84, r*1.68, r*1.68));
+                ink = (ink.getRed()*.299 + ink.getGreen()*.587 + ink.getBlue()*.114) < 145
+                        ? new Color(0xFFF9EE) : new Color(0x1B2430);
+                r *= .7;
             }
-        }
-
-        g2.setColor(color);
-        if (isX) {
-            double k = r * 0.60, sw = r * 0.40;
-            g2.setStroke(new BasicStroke((float) sw, BasicStroke.CAP_ROUND,
-                                         BasicStroke.JOIN_ROUND));
-            g2.draw(new java.awt.geom.Line2D.Double(cx - k, cy - k, cx + k, cy + k));
-            g2.draw(new java.awt.geom.Line2D.Double(cx + k, cy - k, cx - k, cy + k));
-        } else {
-            double rr = r * 0.66, sw = r * 0.38;
-            g2.setStroke(new BasicStroke((float) sw));
-            g2.draw(new Ellipse2D.Double(cx - rr, cy - rr, rr * 2, rr * 2));
-        }
-
-        g2.setStroke(oldStroke);
-        g2.setComposite(old);
+            double k = r*.62;
+            java.awt.Shape glyph;
+            if (isX) {
+                var cross = new java.awt.geom.Path2D.Double();
+                cross.moveTo(cx-k,cy-k); cross.lineTo(cx+k,cy+k);
+                cross.moveTo(cx+k,cy-k); cross.lineTo(cx-k,cy+k);
+                glyph = cross;
+            } else glyph = new Ellipse2D.Double(cx-r*.68,cy-r*.68,r*1.36,r*1.36);
+            if (style == StoneStyle.NEON) {
+                for (int i=3;i>=1;i--) {
+                    g.setColor(alpha(ink, 25));
+                    g.setStroke(new BasicStroke((float)(r*(.2+i*.2)), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    g.draw(glyph);
+                }
+            }
+            g.setColor(ink);
+            int cap = style == StoneStyle.SHARP ? BasicStroke.CAP_SQUARE : BasicStroke.CAP_ROUND;
+            float stroke = (float)(r*(style == StoneStyle.NEON ? .19 : style == StoneStyle.SHARP ? .26 : .38));
+            g.setStroke(new BasicStroke(Math.max(1f, stroke), cap, BasicStroke.JOIN_ROUND));
+            g.draw(glyph);
+        } finally { g.dispose(); }
     }
 
     /**

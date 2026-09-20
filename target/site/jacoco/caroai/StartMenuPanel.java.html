@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StartMenuPanel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">StartMenuPanel.java</span></div><h1>StartMenuPanel.java</h1><pre class="source lang-java linenums">package caroai;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+/**
+ * Title screen: pick a mode and a side.
+ *
+ * The layout is built once in the constructor; resizing only repositions the
+ * components instead of recreating them, so nothing flickers and no selection
+ * is lost.
+ */
+public class StartMenuPanel extends JPanel {
+
+    /** Credit shown in the bottom-right corner. */
+    private static final String AUTHOR = &quot;nbaotoan&quot;;
+
+    // 0 = vs computer, 1 = two players
+<span class="nc" id="L20">    private int selectedMode   = 0;</span>
+    // 0 = X, 1 = O
+<span class="nc" id="L22">    private int selectedSymbol = 0;</span>
+    // Index into Difficulty.values(); Medium is the default.
+<span class="nc" id="L24">    private int selectedLevel  = 1;</span>
+
+    private final Runnable onStart;
+    private final Runnable onSettings;
+
+    private final ModeCard      cardAI, cardHuman;
+    private final SymbolTile    tileX, tileO;
+    private final LevelTile[]   levelTiles;
+    private final JLabel        labelMode, labelSymbol, labelLevel, labelHint;
+    private final ClassicButton startBtn, settingsBtn, exitBtn;
+
+<span class="nc" id="L35">    private int titleBaseline = 160;   // recomputed in layoutUI()</span>
+
+<span class="nc" id="L37">    public StartMenuPanel(Runnable onStart, Runnable onSettings) {</span>
+<span class="nc" id="L38">        this.onStart = onStart;</span>
+<span class="nc" id="L39">        this.onSettings = onSettings;</span>
+<span class="nc" id="L40">        setLayout(null);</span>
+<span class="nc" id="L41">        setBackground(Theme.BG);</span>
+
+<span class="nc" id="L43">        labelMode   = sectionLabel(&quot;SELECT MODE&quot;);</span>
+<span class="nc" id="L44">        labelSymbol = sectionLabel(&quot;CHOOSE YOUR SIDE&quot;);</span>
+<span class="nc" id="L45">        labelLevel  = sectionLabel(&quot;DIFFICULTY&quot;);</span>
+
+<span class="nc" id="L47">        labelHint = new JLabel(&quot;X always moves first&quot;, SwingConstants.CENTER);</span>
+<span class="nc" id="L48">        labelHint.setFont(Theme.ui(Font.PLAIN, 12));</span>
+<span class="nc" id="L49">        labelHint.setForeground(Theme.TEXT_FAINT);</span>
+
+<span class="nc" id="L51">        cardAI    = new ModeCard(0, &quot;Play vs Computer&quot;, &quot;Test your skill against the AI&quot;);</span>
+<span class="nc" id="L52">        cardHuman = new ModeCard(1, &quot;Two Players&quot;,      &quot;Share one screen&quot;);</span>
+
+<span class="nc" id="L54">        tileX = new SymbolTile(0);</span>
+<span class="nc" id="L55">        tileO = new SymbolTile(1);</span>
+
+<span class="nc" id="L57">        Difficulty[] levels = Difficulty.values();</span>
+<span class="nc" id="L58">        levelTiles = new LevelTile[levels.length];</span>
+<span class="nc bnc" id="L59" title="All 2 branches missed.">        for (int i = 0; i &lt; levels.length; i++) levelTiles[i] = new LevelTile(i, levels[i]);</span>
+
+<span class="nc" id="L61">        startBtn = new ClassicButton(&quot;START&quot;, ClassicButton.Kind.PRIMARY);</span>
+<span class="nc" id="L62">        startBtn.setFontSize(15);</span>
+<span class="nc" id="L63">        startBtn.addActionListener(e -&gt; onStart.run());</span>
+
+<span class="nc" id="L65">        settingsBtn = new ClassicButton(&quot;Appearance&quot;, ClassicButton.Kind.QUIET);</span>
+<span class="nc" id="L66">        settingsBtn.addActionListener(e -&gt; this.onSettings.run());</span>
+
+<span class="nc" id="L68">        exitBtn = new ClassicButton(&quot;Exit&quot;, ClassicButton.Kind.QUIET);</span>
+<span class="nc" id="L69">        exitBtn.addActionListener(e -&gt; System.exit(0));</span>
+
+<span class="nc" id="L71">        add(labelMode);</span>
+<span class="nc" id="L72">        add(labelSymbol);</span>
+<span class="nc" id="L73">        add(labelHint);</span>
+<span class="nc" id="L74">        add(cardAI);</span>
+<span class="nc" id="L75">        add(cardHuman);</span>
+<span class="nc" id="L76">        add(tileX);</span>
+<span class="nc" id="L77">        add(tileO);</span>
+<span class="nc" id="L78">        add(labelLevel);</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        for (LevelTile lt : levelTiles) add(lt);</span>
+<span class="nc" id="L80">        add(startBtn);</span>
+<span class="nc" id="L81">        add(settingsBtn);</span>
+<span class="nc" id="L82">        add(exitBtn);</span>
+
+<span class="nc" id="L84">        addComponentListener(new ComponentAdapter() {</span>
+<span class="nc" id="L85">            @Override public void componentResized(ComponentEvent e) { layoutUI(); }</span>
+        });
+
+<span class="nc" id="L88">        updateSymbolVisibility();</span>
+<span class="nc" id="L89">    }</span>
+
+    private JLabel sectionLabel(String text) {
+<span class="nc" id="L92">        JLabel l = new JLabel(text, SwingConstants.CENTER);</span>
+<span class="nc" id="L93">        l.setFont(Theme.ui(Font.BOLD, 10));</span>
+<span class="nc" id="L94">        l.setForeground(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L95">        return l;</span>
+    }
+
+    // ── Layout ───────────────────────────────────────────────
+    private void layoutUI() {
+<span class="nc" id="L100">        int W = getWidth(), H = getHeight();</span>
+<span class="nc bnc" id="L101" title="All 4 branches missed.">        if (W == 0 || H == 0) return;</span>
+
+<span class="nc" id="L103">        int cx = W / 2;</span>
+
+<span class="nc" id="L105">        int cardW = 212, cardH = 118, gap = 20;</span>
+<span class="nc" id="L106">        int blockH = 96 + 22 + cardH + 34 + 18 + 72 + 22 + 18 + 40 + 22 + 52 + 16 + 40;</span>
+<span class="nc" id="L107">        int top = Math.max(40, (H - blockH) / 2);</span>
+
+<span class="nc" id="L109">        titleBaseline = top + 64;</span>
+
+<span class="nc" id="L111">        int y = top + 96;</span>
+
+<span class="nc" id="L113">        labelMode.setBounds(cx - 160, y, 320, 16);</span>
+<span class="nc" id="L114">        y += 22;</span>
+
+<span class="nc" id="L116">        int totalW = cardW * 2 + gap;</span>
+<span class="nc" id="L117">        cardAI.setBounds(cx - totalW / 2, y, cardW, cardH);</span>
+<span class="nc" id="L118">        cardHuman.setBounds(cx - totalW / 2 + cardW + gap, y, cardW, cardH);</span>
+<span class="nc" id="L119">        y += cardH + 34;</span>
+
+<span class="nc" id="L121">        labelSymbol.setBounds(cx - 160, y, 320, 16);</span>
+<span class="nc" id="L122">        y += 18;</span>
+
+<span class="nc" id="L124">        int tile = 72, tgap = 16;</span>
+<span class="nc" id="L125">        tileX.setBounds(cx - tile - tgap / 2, y, tile, tile);</span>
+<span class="nc" id="L126">        tileO.setBounds(cx + tgap / 2,        y, tile, tile);</span>
+<span class="nc" id="L127">        y += tile + 22;</span>
+
+<span class="nc" id="L129">        labelLevel.setBounds(cx - 160, y, 320, 16);</span>
+<span class="nc" id="L130">        y += 18;</span>
+
+<span class="nc" id="L132">        int levelW = 92, levelH = 40, lgap = 10;</span>
+<span class="nc" id="L133">        int levelRow = levelTiles.length * levelW + (levelTiles.length - 1) * lgap;</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        for (int i = 0; i &lt; levelTiles.length; i++) {</span>
+<span class="nc" id="L135">            levelTiles[i].setBounds(cx - levelRow / 2 + i * (levelW + lgap),</span>
+<span class="nc" id="L136">                                    y, levelW, levelH);</span>
+        }
+<span class="nc" id="L138">        y += levelH + 12;</span>
+
+<span class="nc" id="L140">        labelHint.setBounds(cx - 160, y, 320, 16);</span>
+<span class="nc" id="L141">        y += 22;</span>
+
+<span class="nc" id="L143">        startBtn.setBounds(cx - 110, y, 220, 52);</span>
+<span class="nc" id="L144">        y += 52 + 16;</span>
+
+<span class="nc" id="L146">        settingsBtn.setBounds(cx - 125, y, 120, 40);</span>
+<span class="nc" id="L147">        exitBtn.setBounds(cx + 5, y, 120, 40);</span>
+
+<span class="nc" id="L149">        revalidate();</span>
+<span class="nc" id="L150">        repaint();</span>
+<span class="nc" id="L151">    }</span>
+
+    private void updateSymbolVisibility() {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        boolean vsAI = (selectedMode == 0);</span>
+<span class="nc" id="L155">        labelSymbol.setVisible(vsAI);</span>
+<span class="nc" id="L156">        labelHint.setVisible(vsAI);</span>
+<span class="nc" id="L157">        tileX.setVisible(vsAI);</span>
+<span class="nc" id="L158">        tileO.setVisible(vsAI);</span>
+<span class="nc" id="L159">        labelLevel.setVisible(vsAI);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        for (LevelTile lt : levelTiles) lt.setVisible(vsAI);</span>
+<span class="nc" id="L161">    }</span>
+
+    void refreshAppearance() {
+<span class="nc" id="L164">        setBackground(Theme.BG);</span>
+<span class="nc" id="L165">        labelMode.setForeground(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L166">        labelSymbol.setForeground(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L167">        labelLevel.setForeground(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L168">        labelHint.setForeground(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L169">        settingsBtn.setLabel(&quot;Appearance&quot;);</span>
+<span class="nc" id="L170">        repaint();</span>
+<span class="nc" id="L171">    }</span>
+
+    // ── Read by GameFrame ────────────────────────────────────
+<span class="nc" id="L174">    public int     getSelectedMode() { return selectedMode; }</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">    public boolean isVsAI()          { return selectedMode == 0; }</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">    public boolean playerChoseX()    { return selectedSymbol == 0; }</span>
+
+    /** The level chosen on this screen. Two-player games ignore it. */
+    public Difficulty getDifficulty() {
+<span class="nc" id="L180">        Difficulty[] levels = Difficulty.values();</span>
+<span class="nc" id="L181">        int i = Math.max(0, Math.min(selectedLevel, levels.length - 1));</span>
+<span class="nc" id="L182">        return levels[i];</span>
+    }
+
+    // ── Background ───────────────────────────────────────────
+    @Override
+    protected void paintComponent(Graphics g) {
+<span class="nc" id="L188">        Graphics2D g2 = (Graphics2D) g.create();</span>
+<span class="nc" id="L189">        Theme.antialias(g2);</span>
+
+<span class="nc" id="L191">        int W = getWidth(), H = getHeight();</span>
+<span class="nc bnc" id="L192" title="All 4 branches missed.">        if (W &lt;= 0 || H &lt;= 0) { g2.dispose(); return; }   // gradient radius must be &gt; 0</span>
+
+<span class="nc" id="L194">        g2.setColor(Theme.BG);</span>
+<span class="nc" id="L195">        g2.fillRect(0, 0, W, H);</span>
+
+        // Oversized abstract board shapes echo the slate dashboard style.
+<span class="nc" id="L198">        g2.setColor(Theme.alpha(Theme.BOARD_BG_ALT, 85));</span>
+<span class="nc" id="L199">        g2.fillPolygon(new int[]{0,W/3,W},new int[]{H/3,0,H},3);</span>
+<span class="nc" id="L200">        g2.setColor(Theme.alpha(Theme.SURFACE_3, 80));</span>
+<span class="nc" id="L201">        g2.fillPolygon(new int[]{0,W/2,W},new int[]{H,H/2,0},3);</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (W &gt; 850) {</span>
+<span class="nc" id="L203">            Theme.drawStone(g2,true,W*.12,H*.28,85,.11f);</span>
+<span class="nc" id="L204">            Theme.drawStone(g2,false,W*.85,H*.70,115,.12f);</span>
+        }
+
+        // A restrained vignette gives the title area depth in either palette.
+<span class="nc" id="L208">        g2.setPaint(new RadialGradientPaint(</span>
+<span class="nc" id="L209">            new Point(W / 2, H / 2),</span>
+<span class="nc" id="L210">            Math.max(W, H) * 0.72f,</span>
+<span class="nc" id="L211">            new float[] { 0f, 1f },</span>
+<span class="nc" id="L212">            new Color[] { new Color(0, 0, 0, 0),</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                          Theme.mode() == Theme.Mode.DARK</span>
+<span class="nc" id="L214">                              ? new Color(0, 0, 0, 90)</span>
+<span class="nc" id="L215">                              : new Color(65, 46, 20, 22) }</span>
+        ));
+<span class="nc" id="L217">        g2.fillRect(0, 0, W, H);</span>
+
+        // ── Title ────────────────────────────────────────────
+<span class="nc" id="L220">        g2.setFont(Theme.display(Font.BOLD, 52));</span>
+<span class="nc" id="L221">        FontMetrics fm = g2.getFontMetrics();</span>
+<span class="nc" id="L222">        String title = &quot;CARO&quot;;</span>
+<span class="nc" id="L223">        float tracking = 8f;</span>
+<span class="nc" id="L224">        float tw = Theme.trackedWidth(fm, title, tracking);</span>
+
+<span class="nc" id="L226">        g2.setColor(Theme.TEXT);</span>
+<span class="nc" id="L227">        Theme.drawTracked(g2, title, W / 2f - tw / 2f, titleBaseline, tracking);</span>
+
+        // Gold rules flanking the subtitle
+<span class="nc" id="L230">        g2.setFont(Theme.ui(Font.PLAIN, 11));</span>
+<span class="nc" id="L231">        FontMetrics sfm = g2.getFontMetrics();</span>
+<span class="nc" id="L232">        String sub = &quot;FIVE IN A ROW&quot;;</span>
+<span class="nc" id="L233">        float stracking = 2.6f;</span>
+<span class="nc" id="L234">        float sw = Theme.trackedWidth(sfm, sub, stracking);</span>
+<span class="nc" id="L235">        float subY = titleBaseline + 26;</span>
+
+<span class="nc" id="L237">        g2.setColor(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L238">        Theme.drawTracked(g2, sub, W / 2f - sw / 2f, subY, stracking);</span>
+
+<span class="nc" id="L240">        g2.setColor(Theme.GOLD);</span>
+<span class="nc" id="L241">        int lineY = (int) subY - 4;</span>
+<span class="nc" id="L242">        int lineW = 40;</span>
+<span class="nc" id="L243">        g2.fillRect((int) (W / 2f - sw / 2f) - lineW - 16, lineY, lineW, 1);</span>
+<span class="nc" id="L244">        g2.fillRect((int) (W / 2f + sw / 2f) + 16,         lineY, lineW, 1);</span>
+
+        // ── Author credit, bottom-right corner ───────────────
+<span class="nc" id="L247">        String credit = &quot;by &quot; + AUTHOR;</span>
+<span class="nc" id="L248">        g2.setFont(Theme.ui(Font.PLAIN, 11));</span>
+<span class="nc" id="L249">        FontMetrics cfm = g2.getFontMetrics();</span>
+<span class="nc" id="L250">        float ctracking = 1.2f;</span>
+<span class="nc" id="L251">        float cw = Theme.trackedWidth(cfm, credit, ctracking);</span>
+
+<span class="nc" id="L253">        g2.setColor(Theme.TEXT_DIM);</span>
+<span class="nc" id="L254">        Theme.drawTracked(g2, credit, W - 28 - cw, H - 24, ctracking);</span>
+
+<span class="nc" id="L256">        g2.setColor(Theme.alpha(Theme.GOLD, 150));</span>
+<span class="nc" id="L257">        g2.fillRect((int) (W - 28 - cw), H - 18, (int) cw, 1);</span>
+
+<span class="nc" id="L259">        g2.dispose();</span>
+<span class="nc" id="L260">    }</span>
+
+    // ── Mode card ────────────────────────────────────────────
+    private class ModeCard extends JComponent {
+        private final int    index;
+        private final String title, desc;
+<span class="nc" id="L266">        private boolean hovered = false;</span>
+
+<span class="nc" id="L268">        ModeCard(int index, String title, String desc) {</span>
+<span class="nc" id="L269">            this.index = index;</span>
+<span class="nc" id="L270">            this.title = title;</span>
+<span class="nc" id="L271">            this.desc  = desc;</span>
+<span class="nc" id="L272">            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));</span>
+
+<span class="nc" id="L274">            addMouseListener(new MouseAdapter() {</span>
+<span class="nc" id="L275">                @Override public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }</span>
+<span class="nc" id="L276">                @Override public void mouseExited(MouseEvent e)  { hovered = false; repaint(); }</span>
+                @Override public void mousePressed(MouseEvent e) {
+<span class="nc" id="L278">                    selectedMode = ModeCard.this.index;</span>
+<span class="nc" id="L279">                    updateSymbolVisibility();</span>
+<span class="nc" id="L280">                    cardAI.repaint();</span>
+<span class="nc" id="L281">                    cardHuman.repaint();</span>
+<span class="nc" id="L282">                }</span>
+            });
+<span class="nc" id="L284">        }</span>
+
+        @Override
+        protected void paintComponent(Graphics g) {
+<span class="nc" id="L288">            Graphics2D g2 = (Graphics2D) g.create();</span>
+<span class="nc" id="L289">            Theme.antialias(g2);</span>
+
+<span class="nc" id="L291">            int w = getWidth(), h = getHeight();</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            boolean sel = (selectedMode == index);</span>
+
+<span class="nc" id="L294">            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));</span>
+
+            // Illustrate the mode with the game's own stones
+<span class="nc" id="L297">            int tile = 34;</span>
+<span class="nc" id="L298">            int ix = 18, iy = 18;</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            if (index == 0) {</span>
+<span class="nc" id="L300">                Theme.drawStoneTile(g2, true, ix, iy, tile);</span>
+<span class="nc" id="L301">            } else {</span>
+<span class="nc" id="L302">                Theme.drawStoneTile(g2, true,  ix,             iy, tile);</span>
+<span class="nc" id="L303">                Theme.drawStoneTile(g2, false, ix + tile + 8,  iy, tile);</span>
+            }
+
+<span class="nc" id="L306">            g2.setFont(Theme.display(Font.BOLD, 17));</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">            g2.setColor(sel ? Theme.TEXT : Theme.TEXT_DIM);</span>
+<span class="nc" id="L308">            g2.drawString(title, 18, iy + tile + 28);</span>
+
+<span class="nc" id="L310">            g2.setFont(Theme.ui(Font.PLAIN, 11));</span>
+<span class="nc" id="L311">            g2.setColor(Theme.TEXT_FAINT);</span>
+<span class="nc" id="L312">            g2.drawString(desc, 18, iy + tile + 46);</span>
+
+<span class="nc" id="L314">            g2.dispose();</span>
+<span class="nc" id="L315">        }</span>
+    }
+
+    // ── X / O picker ─────────────────────────────────────────
+    private class SymbolTile extends JComponent {
+        private final int index;
+<span class="nc" id="L321">        private boolean hovered = false;</span>
+
+<span class="nc" id="L323">        SymbolTile(int index) {</span>
+<span class="nc" id="L324">            this.index = index;</span>
+<span class="nc" id="L325">            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));</span>
+
+<span class="nc" id="L327">            addMouseListener(new MouseAdapter() {</span>
+<span class="nc" id="L328">                @Override public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }</span>
+<span class="nc" id="L329">                @Override public void mouseExited(MouseEvent e)  { hovered = false; repaint(); }</span>
+                @Override public void mousePressed(MouseEvent e) {
+<span class="nc" id="L331">                    selectedSymbol = SymbolTile.this.index;</span>
+<span class="nc" id="L332">                    tileX.repaint();</span>
+<span class="nc" id="L333">                    tileO.repaint();</span>
+<span class="nc" id="L334">                }</span>
+            });
+<span class="nc" id="L336">        }</span>
+
+        @Override
+        protected void paintComponent(Graphics g) {
+<span class="nc" id="L340">            Graphics2D g2 = (Graphics2D) g.create();</span>
+<span class="nc" id="L341">            Theme.antialias(g2);</span>
+
+<span class="nc" id="L343">            int w = getWidth(), h = getHeight();</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            boolean sel = (selectedSymbol == index);</span>
+
+<span class="nc" id="L346">            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));</span>
+
+<span class="nc" id="L348">            int tile = w - 22;</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            Theme.drawStoneTile(g2, index == 0, 11, (h - tile) / 2, tile);</span>
+
+<span class="nc" id="L351">            g2.dispose();</span>
+<span class="nc" id="L352">        }</span>
+    }
+
+    // ── Difficulty picker ────────────────────────────────────
+    private class LevelTile extends JComponent {
+        private final int        index;
+        private final Difficulty level;
+<span class="nc" id="L359">        private boolean hovered = false;</span>
+
+<span class="nc" id="L361">        LevelTile(int index, Difficulty level) {</span>
+<span class="nc" id="L362">            this.index = index;</span>
+<span class="nc" id="L363">            this.level = level;</span>
+<span class="nc" id="L364">            setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));</span>
+
+<span class="nc" id="L366">            addMouseListener(new MouseAdapter() {</span>
+<span class="nc" id="L367">                @Override public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }</span>
+<span class="nc" id="L368">                @Override public void mouseExited(MouseEvent e)  { hovered = false; repaint(); }</span>
+                @Override public void mousePressed(MouseEvent e) {
+<span class="nc" id="L370">                    selectedLevel = LevelTile.this.index;</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                    for (LevelTile lt : levelTiles) lt.repaint();</span>
+<span class="nc" id="L372">                }</span>
+            });
+<span class="nc" id="L374">        }</span>
+
+        @Override
+        protected void paintComponent(Graphics g) {
+<span class="nc" id="L378">            Graphics2D g2 = (Graphics2D) g.create();</span>
+<span class="nc" id="L379">            Theme.antialias(g2);</span>
+
+<span class="nc" id="L381">            int w = getWidth(), h = getHeight();</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            boolean sel = (selectedLevel == index);</span>
+
+<span class="nc" id="L384">            g2.translate(0, ControlSurface.choice(g2, w, h, sel, hovered));</span>
+
+<span class="nc bnc" id="L386" title="All 2 branches missed.">            g2.setFont(Theme.ui(sel ? Font.BOLD : Font.PLAIN, 12));</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            g2.setColor(sel ? Theme.TEXT : Theme.TEXT_DIM);</span>
+<span class="nc" id="L388">            Theme.drawCentered(g2, level.label(), w / 2, h / 2);</span>
+
+<span class="nc" id="L390">            g2.dispose();</span>
+<span class="nc" id="L391">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

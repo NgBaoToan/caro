@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GameEngine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">GameEngine.java</span></div><h1>GameEngine.java</h1><pre class="source lang-java linenums">package caroai;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Core game rules: stones on the board, turn order, win detection.
+ *
+ * The engine owns the one and only copy of the board. Nothing else keeps a
+ * mirror of it — the UI and the AI both read this map. That removes the whole
+ * class of bugs where a second copy drifts out of sync with the real board.
+ *
+ * Coordinate safety lives here too: {@link #makeMove} refuses anything outside
+ * the board, so no caller can push an out-of-range coordinate deeper into the
+ * program.
+ */
+public class GameEngine {
+
+<span class="fc" id="L22">    public enum Cell { X, O }</span>
+
+    /** Board width/height in cells when no explicit size is given. */
+    public static final int DEFAULT_SIZE = 50;
+
+    /** Stones in a row needed to win. */
+    public static final int WIN_LENGTH = 5;
+
+    private final int size;
+
+<span class="fc" id="L32">    private final Map&lt;Coord, Cell&gt; board = new HashMap&lt;&gt;();</span>
+
+    private final Player player1, player2;
+    private Player currentPlayer;
+
+<span class="fc" id="L37">    private Coord lastPlayerMove = null;   // last stone placed by the human side</span>
+
+<span class="fc" id="L39">    private Cell playerSymbol = Cell.X;</span>
+<span class="fc" id="L40">    private Cell aiSymbol     = Cell.O;</span>
+
+    public GameEngine(Player p1, Player p2) {
+<span class="fc" id="L43">        this(p1, p2, DEFAULT_SIZE);</span>
+<span class="fc" id="L44">    }</span>
+
+<span class="fc" id="L46">    public GameEngine(Player p1, Player p2, int size) {</span>
+        // A board smaller than the win length can never be won, so clamp it.
+<span class="fc" id="L48">        this.size    = Math.max(WIN_LENGTH, size);</span>
+<span class="fc" id="L49">        this.player1 = p1;</span>
+<span class="fc" id="L50">        this.player2 = p2;</span>
+<span class="fc" id="L51">        this.currentPlayer = p1;</span>
+<span class="fc" id="L52">    }</span>
+
+    // ── Board state ──────────────────────────────────────────
+
+<span class="fc" id="L56">    public int getSize() { return size; }</span>
+
+    /** Read-only view of the board. Mutations go through {@link #makeMove}. */
+<span class="fc" id="L59">    public Map&lt;Coord, Cell&gt; getBoard() { return Collections.unmodifiableMap(board); }</span>
+
+<span class="fc" id="L61">    public Cell cellAt(Coord c) { return board.get(c); }</span>
+
+<span class="fc" id="L63">    public boolean isEmpty() { return board.isEmpty(); }</span>
+
+<span class="fc" id="L65">    public boolean isOccupied(Coord c) { return board.containsKey(c); }</span>
+
+    /** True when the coordinate lies on the board. */
+<span class="fc bfc" id="L68" title="All 4 branches covered.">    public boolean isInside(Coord c) { return c != null &amp;&amp; c.isInside(size); }</span>
+
+    // ── Symbols &amp; players ────────────────────────────────────
+
+<span class="fc" id="L72">    public void setPlayerSymbol(Cell c) { this.playerSymbol = c; }</span>
+<span class="fc" id="L73">    public void setAISymbol(Cell c)     { this.aiSymbol = c; }</span>
+
+<span class="nc" id="L75">    public Cell getPlayerSymbol() { return playerSymbol; }</span>
+<span class="fc" id="L76">    public Cell getAISymbol()     { return aiSymbol; }</span>
+
+    /** The symbol the opponent of {@code c} plays. */
+<span class="fc bfc" id="L79" title="All 2 branches covered.">    public static Cell opponentOf(Cell c) { return c == Cell.X ? Cell.O : Cell.X; }</span>
+
+<span class="fc" id="L81">    public Player getCurrentPlayer() { return currentPlayer; }</span>
+<span class="nc" id="L82">    public Coord  getLastMoveOfPlayer() { return lastPlayerMove; }</span>
+
+    public void switchTurn() {
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        currentPlayer = (currentPlayer == player1 ? player2 : player1);</span>
+<span class="fc" id="L86">    }</span>
+
+    /** Lets the caller decide who opens (e.g. the AI when the human picked O). */
+<span class="fc" id="L89">    public void setCurrentPlayer(Player p) { this.currentPlayer = p; }</span>
+
+    // ── Moves ────────────────────────────────────────────────
+
+    /**
+     * Places a stone. Returns false — without changing anything — when the
+     * coordinate is null, off the board, or already taken.
+     *
+     * This is the single gate every move passes through, which is why bounds
+     * checking belongs here and not scattered across the UI.
+     */
+    public boolean makeMove(Coord c, Cell symbol) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!isInside(c)) return false;</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (board.containsKey(c)) return false;</span>
+
+<span class="fc" id="L104">        board.put(c, symbol);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (symbol == playerSymbol) lastPlayerMove = c;</span>
+<span class="fc" id="L106">        return true;</span>
+    }
+
+    /** Removes a stone (used by undo). Returns true if something was removed. */
+    public boolean undoMove(Coord c) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (c == null) return false;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        boolean removed = board.remove(c) != null;</span>
+<span class="fc bfc" id="L113" title="All 4 branches covered.">        if (removed &amp;&amp; c.equals(lastPlayerMove)) lastPlayerMove = null;</span>
+<span class="fc" id="L114">        return removed;</span>
+    }
+
+    // ── Win detection ────────────────────────────────────────
+
+<span class="fc" id="L119">    private static final int[][] DIRECTIONS = { {1, 0}, {0, 1}, {1, 1}, {1, -1} };</span>
+
+    public boolean checkWin(Coord c) {
+<span class="fc" id="L122">        Cell stone = board.get(c);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (stone == null) return false;</span>
+
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        for (int[] d : DIRECTIONS) {</span>
+<span class="fc" id="L126">            int count = 1</span>
+<span class="fc" id="L127">                    + countDir(c,  d[0],  d[1], stone)</span>
+<span class="fc" id="L128">                    + countDir(c, -d[0], -d[1], stone);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">            if (count &gt;= WIN_LENGTH) return true;</span>
+        }
+<span class="fc" id="L131">        return false;</span>
+    }
+
+    /** The five stones that won, or an empty list when there is no win. */
+    public List&lt;Coord&gt; getWinningLine(Coord c) {
+<span class="fc" id="L136">        Cell stone = board.get(c);</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (stone == null) return new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int[] d : DIRECTIONS) {</span>
+<span class="fc" id="L140">            List&lt;Coord&gt; line = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L141">            line.add(c);</span>
+<span class="fc" id="L142">            line.addAll(collectDir(c,  d[0],  d[1], stone));</span>
+<span class="fc" id="L143">            line.addAll(collectDir(c, -d[0], -d[1], stone));</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (line.size() &gt;= WIN_LENGTH) return line.subList(0, WIN_LENGTH);</span>
+        }
+<span class="fc" id="L146">        return new ArrayList&lt;&gt;();</span>
+    }
+
+    private int countDir(Coord from, int dCol, int dRow, Cell stone) {
+<span class="fc" id="L150">        int count = 0;</span>
+<span class="fc" id="L151">        Coord c = from.offset(dCol, dRow);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        while (board.get(c) == stone) {</span>
+<span class="fc" id="L153">            count++;</span>
+<span class="fc" id="L154">            c = c.offset(dCol, dRow);</span>
+        }
+<span class="fc" id="L156">        return count;</span>
+    }
+
+    private List&lt;Coord&gt; collectDir(Coord from, int dCol, int dRow, Cell stone) {
+<span class="fc" id="L160">        List&lt;Coord&gt; line = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L161">        Coord c = from.offset(dCol, dRow);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        while (board.get(c) == stone) {</span>
+<span class="fc" id="L163">            line.add(c);</span>
+<span class="fc" id="L164">            c = c.offset(dCol, dRow);</span>
+        }
+<span class="fc" id="L166">        return line;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

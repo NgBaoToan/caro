@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppearanceSettings.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">AppearanceSettings.java</span></div><h1>AppearanceSettings.java</h1><pre class="source lang-java linenums">package caroai;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.util.function.BiConsumer;
+
+/** Staged appearance editor: previewing or canceling never changes a running game. */
+final class AppearanceSettings {
+    private AppearanceSettings() {}
+
+    static void show(GameFrame frame) {
+<span class="nc" id="L13">        JDialog dialog = new JDialog(frame, &quot;Giao diện và quân cờ&quot;, true);</span>
+<span class="nc" id="L14">        dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);</span>
+<span class="nc" id="L15">        JPanel content = createContent((mode, style) -&gt; {</span>
+<span class="nc" id="L16">            frame.setAppearance(mode, style);</span>
+<span class="nc" id="L17">            dialog.dispose();</span>
+<span class="nc" id="L18">        }, dialog::dispose);</span>
+<span class="nc" id="L19">        JScrollPane scroll = new JScrollPane(content);</span>
+<span class="nc" id="L20">        scroll.setBorder(null);</span>
+<span class="nc" id="L21">        scroll.getVerticalScrollBar().setUnitIncrement(20);</span>
+<span class="nc" id="L22">        dialog.setContentPane(scroll);</span>
+<span class="nc" id="L23">        Rectangle screen = frame.getGraphicsConfiguration().getBounds();</span>
+<span class="nc" id="L24">        Insets inset = Toolkit.getDefaultToolkit().getScreenInsets(frame.getGraphicsConfiguration());</span>
+<span class="nc" id="L25">        dialog.setSize(Math.min(650, screen.width-inset.left-inset.right-32),</span>
+<span class="nc" id="L26">                Math.min(720, screen.height-inset.top-inset.bottom-48));</span>
+<span class="nc" id="L27">        dialog.setLocationRelativeTo(frame);</span>
+<span class="nc" id="L28">        dialog.getRootPane().registerKeyboardAction(e -&gt; dialog.dispose(),</span>
+<span class="nc" id="L29">                KeyStroke.getKeyStroke(&quot;ESCAPE&quot;), JComponent.WHEN_IN_FOCUSED_WINDOW);</span>
+<span class="nc" id="L30">        dialog.setVisible(true);</span>
+<span class="nc" id="L31">    }</span>
+
+    static JPanel createContent(BiConsumer&lt;Theme.Mode, Theme.StoneStyle&gt; apply, Runnable cancel) {
+<span class="fc" id="L34">        Theme.Mode[] mode = {Theme.mode()};</span>
+<span class="fc" id="L35">        Theme.StoneStyle[] style = {Theme.stoneStyle()};</span>
+<span class="fc" id="L36">        JPanel root = new JPanel();</span>
+<span class="fc" id="L37">        root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L38">        root.setBorder(new EmptyBorder(26,28,26,28));</span>
+<span class="fc" id="L39">        root.setBackground(Theme.SURFACE);</span>
+<span class="fc" id="L40">        root.add(label(&quot;Bàn cờ theo cách của bạn&quot;, 25, Font.BOLD));</span>
+<span class="fc" id="L41">        root.add(Box.createVerticalStrut(8));</span>
+<span class="fc" id="L42">        root.add(label(&quot;Chọn giao diện và kiểu quân. Ván đang chơi được giữ nguyên.&quot;, 12, Font.PLAIN));</span>
+<span class="fc" id="L43">        root.add(Box.createVerticalStrut(24));</span>
+<span class="fc" id="L44">        Preview preview = new Preview(mode, style);</span>
+<span class="fc" id="L45">        JPanel modes = row(1,2);</span>
+<span class="fc" id="L46">        ButtonGroup themeGroup = new ButtonGroup();</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">        for (Theme.Mode option : Theme.Mode.values()) {</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            JToggleButton button = choice(option == Theme.Mode.DARK ? &quot;Tối · Slate&quot; : &quot;Sáng · Ivory&quot;);</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            button.setSelected(mode[0] == option);</span>
+<span class="fc" id="L50">            themeGroup.add(button); modes.add(button);</span>
+<span class="fc" id="L51">            button.addActionListener(e -&gt; { mode[0]=option; preview.repaint(); });</span>
+        }
+<span class="fc" id="L53">        root.add(label(&quot;GIAO DIỆN&quot;,11,Font.BOLD)); root.add(Box.createVerticalStrut(9));</span>
+<span class="fc" id="L54">        modes.setMaximumSize(new Dimension(Integer.MAX_VALUE,44)); root.add(modes);</span>
+<span class="fc" id="L55">        root.add(Box.createVerticalStrut(20));</span>
+<span class="fc" id="L56">        root.add(label(&quot;HÌNH DẠNG QUÂN X / O&quot;,11,Font.BOLD)); root.add(Box.createVerticalStrut(9));</span>
+<span class="fc" id="L57">        JPanel styles = row(2,2);</span>
+<span class="fc" id="L58">        ButtonGroup styleGroup = new ButtonGroup();</span>
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        for (Theme.StoneStyle option : Theme.StoneStyle.values()) {</span>
+<span class="fc" id="L60">            JToggleButton button = choice(option.label());</span>
+<span class="fc" id="L61">            button.setIcon(new Icon() {</span>
+<span class="nc" id="L62">                public int getIconWidth() { return 66; }</span>
+<span class="nc" id="L63">                public int getIconHeight() { return 40; }</span>
+                public void paintIcon(Component c, Graphics graphics, int x, int y) {
+<span class="nc" id="L65">                    Theme.drawStone((Graphics2D) graphics,true,x+16,y+20,13,1,option,Theme.TEXT);</span>
+<span class="nc" id="L66">                    Theme.drawStone((Graphics2D) graphics,false,x+48,y+20,13,1,option,Theme.STONE_O);</span>
+<span class="nc" id="L67">                }</span>
+            });
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            button.setSelected(style[0] == option); styleGroup.add(button); styles.add(button);</span>
+<span class="fc" id="L70">            button.addActionListener(e -&gt; { style[0]=option; preview.repaint(); });</span>
+        }
+<span class="fc" id="L72">        styles.setMaximumSize(new Dimension(Integer.MAX_VALUE,112)); root.add(styles);</span>
+<span class="fc" id="L73">        root.add(Box.createVerticalStrut(20));</span>
+<span class="fc" id="L74">        root.add(label(&quot;XEM TRƯỚC&quot;,11,Font.BOLD)); root.add(Box.createVerticalStrut(9));</span>
+<span class="fc" id="L75">        preview.setAlignmentX(Component.LEFT_ALIGNMENT);</span>
+<span class="fc" id="L76">        preview.setPreferredSize(new Dimension(540,170));</span>
+<span class="fc" id="L77">        preview.setMinimumSize(new Dimension(250,170));</span>
+<span class="fc" id="L78">        preview.setMaximumSize(new Dimension(Integer.MAX_VALUE,170)); root.add(preview);</span>
+<span class="fc" id="L79">        root.add(Box.createVerticalStrut(12));</span>
+<span class="fc" id="L80">        root.add(label(&quot;Lựa chọn được ghi nhớ cho lần mở game tiếp theo.&quot;,12,Font.PLAIN));</span>
+<span class="fc" id="L81">        root.add(Box.createVerticalStrut(22));</span>
+<span class="fc" id="L82">        JPanel actions = row(1,2);</span>
+<span class="fc" id="L83">        JButton back = action(&quot;Hủy&quot;, false); JButton save = action(&quot;Áp dụng&quot;, true);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (JButton button : new JButton[]{back,save}) {</span>
+<span class="fc" id="L85">            button.setFont(Theme.ui(Font.BOLD,14)); button.setFocusPainted(true);</span>
+<span class="fc" id="L86">            button.setBackground(Theme.SURFACE_2); button.setForeground(Theme.TEXT);</span>
+        }
+<span class="fc" id="L88">        back.addActionListener(e -&gt; cancel.run()); save.addActionListener(e -&gt; apply.accept(mode[0],style[0]));</span>
+<span class="fc" id="L89">        actions.add(back);actions.add(save);actions.setMaximumSize(new Dimension(Integer.MAX_VALUE,44));root.add(actions);</span>
+<span class="fc" id="L90">        return root;</span>
+    }
+
+    private static JLabel label(String text,int size,int weight) {
+<span class="fc" id="L94">        JLabel label = new JLabel(text);label.setFont(Theme.ui(weight,size));</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        label.setForeground(weight==Font.BOLD ? Theme.TEXT : Theme.TEXT_DIM);</span>
+<span class="fc" id="L96">        label.setAlignmentX(Component.LEFT_ALIGNMENT);return label;</span>
+    }
+
+    private static JPanel row(int rows,int cols) {
+<span class="fc" id="L100">        JPanel panel = new JPanel(new GridLayout(rows,cols,10,8));panel.setOpaque(false);</span>
+<span class="fc" id="L101">        panel.setAlignmentX(Component.LEFT_ALIGNMENT);return panel;</span>
+    }
+
+    private static JButton action(String text, boolean primary) {
+<span class="fc" id="L105">        JButton button = new JButton(text) {</span>
+            @Override protected void paintComponent(Graphics graphics) {
+<span class="nc" id="L107">                Graphics2D g = (Graphics2D) graphics.create();</span>
+<span class="nc" id="L108">                Theme.antialias(g);</span>
+<span class="nc bnc" id="L109" title="All 4 branches missed.">                int sink = ControlSurface.choice(g, getWidth(), getHeight(), primary || hasFocus(),</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">                        getModel().isRollover() || getModel().isPressed());</span>
+<span class="nc" id="L111">                g.translate(0, sink);</span>
+<span class="nc" id="L112">                super.paintComponent(g);</span>
+<span class="nc" id="L113">                g.dispose();</span>
+<span class="nc" id="L114">            }</span>
+        };
+<span class="fc" id="L116">        button.setContentAreaFilled(false); button.setBorderPainted(false); button.setFocusPainted(false);</span>
+<span class="fc" id="L117">        button.setRolloverEnabled(true);</span>
+<span class="fc" id="L118">        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));</span>
+<span class="fc" id="L119">        return button;</span>
+    }
+
+    private static JToggleButton choice(String text) {
+<span class="fc" id="L123">        JToggleButton button = new JToggleButton(text) {</span>
+            @Override protected void paintComponent(Graphics graphics) {
+<span class="nc" id="L125">                Graphics2D g = (Graphics2D) graphics.create();Theme.antialias(g);</span>
+<span class="nc" id="L126">                int sink = ControlSurface.choice(g, getWidth(), getHeight(),</span>
+<span class="nc bnc" id="L127" title="All 8 branches missed.">                        isSelected() || hasFocus(), getModel().isRollover() || getModel().isPressed());</span>
+<span class="nc" id="L128">                g.translate(0, sink);</span>
+<span class="nc" id="L129">                super.paintComponent(g);</span>
+<span class="nc" id="L130">                g.dispose();</span>
+<span class="nc" id="L131">            }</span>
+        };
+<span class="fc" id="L133">        button.setFont(Theme.ui(Font.BOLD,13));button.setForeground(Theme.TEXT);</span>
+<span class="fc" id="L134">        button.setRolloverEnabled(true);</span>
+<span class="fc" id="L135">        button.setContentAreaFilled(false);button.setBorderPainted(false);button.setFocusPainted(false);</span>
+<span class="fc" id="L136">        button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));return button;</span>
+    }
+
+    private static final class Preview extends JPanel {
+        private final Theme.Mode[] mode;
+        private final Theme.StoneStyle[] style;
+<span class="fc" id="L142">        Preview(Theme.Mode[] mode,Theme.StoneStyle[] style) {this.mode=mode;this.style=style;}</span>
+        @Override protected void paintComponent(Graphics graphics) {
+<span class="nc" id="L144">            Graphics2D g = (Graphics2D) graphics.create();Theme.antialias(g);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            boolean dark = mode[0] == Theme.Mode.DARK;</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            Color base = new Color(dark ? 0x343F4E : 0xFFF9E9);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            Color alternate = new Color(dark ? 0x48566A : 0xF7EFDA);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">            Color xInk = new Color(dark ? 0xF1F5FA : 0x242A25);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            Color oInk = new Color(dark ? 0xF4BB75 : 0x9A3E32);</span>
+<span class="nc" id="L150">            int cell=42;</span>
+<span class="nc" id="L151">            g.setColor(base);g.fillRect(0,0,getWidth(),getHeight());</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">            for(int x=0;x&lt;getWidth();x+=cell)for(int y=0;y&lt;getHeight();y+=cell){</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                if((x/cell+y/cell)%2==0){g.setColor(alternate);g.fillRect(x,y,cell,cell);}</span>
+            }
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            g.setColor(new Color(dark ? 0x66778B : 0xC4B9A7));</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            for(int x=0;x&lt;getWidth();x+=cell)g.drawLine(x,0,x,getHeight());</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            for(int y=0;y&lt;getHeight();y+=cell)g.drawLine(0,y,getWidth(),y);</span>
+<span class="nc" id="L158">            int start=Math.max(0,(getWidth()/cell-5)/2)*cell;</span>
+<span class="nc bnc" id="L159" title="All 6 branches missed.">            for(int i=0;i&lt;5;i++) Theme.drawStone(g,i%2==0,start+i*cell+21,63,16,1,style[0],i%2==0?xInk:oInk);</span>
+<span class="nc" id="L160">            Theme.drawStone(g,false,start+2*cell+21,105,16,1,style[0],oInk);</span>
+<span class="nc" id="L161">            Theme.drawStone(g,true,start+3*cell+21,105,16,1,style[0],xInk);</span>
+<span class="nc" id="L162">            g.dispose();</span>
+<span class="nc" id="L163">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

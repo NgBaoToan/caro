@@ -12,6 +12,8 @@ public class MenuPanel extends JPanel {
     private static final int WIDTH = 248;
 
     private final TurnCard turnCard;
+    private final AdvantagePanel advantage = new AdvantagePanel();
+    private final JLabel hintStatus = new JLabel("Bấm để đánh dấu ô nên đi");
     private final ClassicButton settingsBtn;
     private final String   difficultyLabel;
 
@@ -22,7 +24,7 @@ public class MenuPanel extends JPanel {
         setLayout(null);
         setOpaque(true);
         setBackground(Theme.SURFACE);
-        setPreferredSize(new Dimension(WIDTH, 0));
+        setPreferredSize(new Dimension(WIDTH, 820));
         setMinimumSize(new Dimension(WIDTH, 0));
 
         int pad      = 22;
@@ -35,7 +37,17 @@ public class MenuPanel extends JPanel {
         turnCard = new TurnCard();
         turnCard.setBounds(pad, y, contentW, 78);
         add(turnCard);
-        y += 78 + 28;
+        y += 78 + 12;
+        advantage.setBounds(pad, y, contentW, 94);
+        add(advantage);
+        y += 94 + 14;
+
+        ClassicButton hintBtn = new ClassicButton("Gợi ý nước đi", ClassicButton.Kind.PRIMARY);
+        hintBtn.setBounds(pad, y, contentW, 42);
+        hintBtn.addActionListener(e -> frame.requestHint());
+        add(hintBtn); y += 46;
+        hintStatus.setFont(Theme.ui(Font.PLAIN, 10)); hintStatus.setForeground(Theme.TEXT_DIM);
+        hintStatus.setBounds(pad, y, contentW, 20); add(hintStatus); y += 28;
 
         String[][] buttons = {
             { "\u21B6", "Undo",     "undo"    },
@@ -61,11 +73,20 @@ public class MenuPanel extends JPanel {
         add(menuBtn);
         y += 42 + 8;
 
-        settingsBtn = new ClassicButton("⚙", "Theme: " + Theme.mode().name(),
+        settingsBtn = new ClassicButton("⚙", "Appearance",
                                                       ClassicButton.Kind.QUIET);
         settingsBtn.setBounds(pad, y, contentW, 42);
         settingsBtn.addActionListener(e -> AppearanceSettings.show(frame));
         add(settingsBtn);
+        y += 42 + 8;
+
+        ClassicButton soundBtn = new ClassicButton(soundLabel(), ClassicButton.Kind.QUIET);
+        soundBtn.setBounds(pad, y, contentW, 42);
+        soundBtn.addActionListener(e -> {
+            SoundEffects.setEnabled(!SoundEffects.isEnabled());
+            soundBtn.setLabel(soundLabel());
+        });
+        add(soundBtn);
         y += 42 + 8;
 
         ClassicButton exitBtn = new ClassicButton("\u2715", "Exit",
@@ -75,9 +96,16 @@ public class MenuPanel extends JPanel {
         add(exitBtn);
     }
 
+    private static String soundLabel() { return "Sound: " + (SoundEffects.isEnabled() ? "ON" : "OFF"); }
+
     /** Called by GameFrame every time the board repaints. */
     public void updateCurrentPlayer(String symbol) {
         turnCard.setSymbol(symbol);
+    }
+
+    public void updateEvaluation(GameEngine engine) { advantage.updatePosition(engine); }
+    public void setHintStatus(String text) {
+        hintStatus.setText(text.isEmpty() ? "Bấm để đánh dấu ô nên đi" : text);
     }
 
     /** Shows that a background search is running. */
@@ -86,8 +114,9 @@ public class MenuPanel extends JPanel {
     }
 
     public void refreshAppearance() {
+        hintStatus.setForeground(Theme.TEXT_DIM);
         setBackground(Theme.SURFACE);
-        settingsBtn.setLabel("Theme: " + Theme.mode().name());
+        settingsBtn.setLabel("Appearance");
         repaint();
     }
 

@@ -1,122 +1,55 @@
 # CaroAI
 
-**Language:** **English** · [Tiếng Việt](README.vi.md)
+Game cờ Caro bằng **Java 21**, có bản **desktop (Swing)** và **web**. Chơi với AI ba mức Easy / Medium / Hard hoặc hai người trên cùng thiết bị. Bàn cờ 50 × 50; X đi trước, nối từ năm quân liên tiếp để thắng.
 
-A desktop Gomoku game built with Java 21 and Swing. Play locally against another person or against an AI with three difficulty levels. The interface is custom drawn and supports Light and Dark themes.
+## Cập nhật ngày 20/09/2026
 
-## At a glance
+- Làm mới giao diện theo phong cách Chess.com: sáng/tối, bốn kiểu quân **Bo tròn, Góc cạnh, Neon, Huy hiệu**.
+- Thêm bóng đổ, viền sáng cho nút và hiệu ứng chìm khi rê chuột vào lựa chọn.
+- Thêm tiếng đặt quân cho người và AI; cắt bỏ khoảng lặng, giữ một tiếng gõ **0,25 giây**, có bật/tắt âm thanh.
+- Thêm **thanh lợi thế X/O** trên desktop và web, cho biết bên đang bất lợi. Phần trăm là đánh giá thế cờ, không phải xác suất thắng chính xác.
+- Thêm **Gợi ý nước đi** trên desktop: khoanh vàng ô nên đi, hiện cột/hàng, không tự đánh. Gợi ý chạy nền và được hủy khi đánh nước mới, hoàn tác hoặc đổi ván.
+- Khôi phục và cập nhật bản web: đấu AI, hai người cùng thiết bị, hoàn tác, gợi ý, lưu/mở ván JSON, tùy chỉnh giao diện và âm thanh.
+- Chuẩn bị **Dockerfile và cấu hình Render** để triển khai thành link chơi công khai.
 
-| Area | What is implemented |
-|---|---|
-| Gameplay | 50 × 50 board, five in a row, local two player mode, undo, restart and win highlighting |
-| AI | Minimax with alpha-beta pruning, iterative deepening, tactical win/block checks and bounded threat search |
-| Search performance | Move ordering, nearby candidate selection, incremental evaluation and a Zobrist transposition table |
-| Interface | Custom Swing/Graphics2D components, board panning, hover preview, result overlay and saved theme preference |
-| Quality | JUnit 5 and AssertJ tests, JaCoCo configuration and reproducible benchmark tools |
+## Chạy bản desktop
 
-The default AI level is **Medium**. **X always moves first**; when you choose O, the computer opens.
+Máy phát triển cần **JDK 21** và **Maven 3.8+**. Chạy trong thư mục dự án:
 
-## Requirements
-
-- JDK **21** or newer (`java -version` and `javac -version`)
-- Maven **3.8+** for the standard build and test workflow
-- A desktop environment for the Swing window
-
-Maven downloads test dependencies on the first build. The game itself does not require a network connection.
-
-## Run the game
-
-From the repository root:
-
-```bash
-mvn clean package
+```powershell
+mvn package
 java -jar target/caroai.jar
 ```
 
-`mvn clean package` compiles the current sources, runs the tests and creates the runnable JAR. Rebuild after changing code; an older JAR may not contain your latest edits.
+Chọn chế độ, quân X/O và độ khó rồi bấm **START**. Dùng **WASD** để di chuyển bàn cờ. Cột trái có **Undo**, **Gợi ý nước đi**, **New Game**, **Appearance** và **Sound: ON/OFF**.
 
-Without Maven, compile the application directly:
+Sau khi cập nhật mã, build lại và đóng/mở lại game để dùng bản mới.
 
-```bash
-mkdir -p out
-javac -d out src/main/java/caroai/*.java
-java -cp out caroai.Main
-```
-
-On Windows PowerShell:
+## Chạy bản web
 
 ```powershell
-New-Item -ItemType Directory -Force out | Out-Null
-javac -d out (Get-ChildItem src/main/java/caroai -Filter *.java | ForEach-Object FullName)
-java -cp out caroai.Main
+.\run-web.ps1
 ```
 
-The `javac` route starts the game but does not run the JUnit test suite.
+Mở [http://127.0.0.1:8088](http://127.0.0.1:8088). Bấm/chạm để đặt quân, kéo để di chuyển bàn cờ, cuộn hoặc dùng nút +/− để zoom. Lưu ván trước khi tải lại trang.
 
-## Play
+Địa chỉ trên chỉ dùng tại máy đang chạy server. Muốn bạn bè mở link và chơi ngay, triển khai theo [hướng dẫn Render / Docker](docs/WEB_DEPLOY.md). Người chơi bản web không cần cài Java.
 
-1. Select **Play vs Computer** or **Two Players**.
-2. Against the computer, choose X or O and select Easy, Medium or Hard.
-3. Select **START**. Click an empty cell to place a stone.
+**Hiện chưa triển khai link công khai**, chưa có phòng đấu giữa hai thiết bị, tài khoản hoặc bảng xếp hạng. Lưu/mở ván hiện có trên bản web.
 
-| Action | Control |
-|---|---|
-| Pan the board | W, A, S, D after clicking the board |
-| Undo | **Undo** in the left rail |
-| Start a new game | **New Game** in the left rail |
-| Return to title screen | **Main Menu** in the left rail |
-| Change appearance | **Theme: DARK/LIGHT** on the title screen or in the left rail |
-| Play again after a result | **PLAY AGAIN** or R |
-| Return to the menu after a result | **Main Menu** or Esc |
+## Kiểm thử
 
-The theme picker shows Light and Dark previews. Switching themes keeps the current game and saves the choice for the next launch through Java Preferences.
-
-## AI and response time
-
-All three levels use the same search algorithm; depth, candidate count and time budget change by level.
-
-| Level | Maximum depth | Candidate limit | Search budget | Minimum response time |
-|---|---:|---:|---:|---:|
-| Easy | 2 | 8 | 250 ms | 70 ms |
-| Medium | 4 | 12 | 700 ms | 40 ms |
-| Hard | 7 | 16 | 850 ms | None |
-
-The time budget is a search deadline, not a promise that every move takes that long or that the maximum depth is always reached. The minimum response time is a short interface pause for fast searches. Hard can return the best move from its last **completed** depth when the budget expires. Searches run in a `SwingWorker` so the window remains responsive.
-
-The AI first checks for an immediate win, then a mandatory block. It searches nearby empty cells, orders candidates by a pattern based score, and uses alpha-beta pruning. Zobrist hashing and a transposition table reuse positions reached by different move orders. Threat search at the horizon is bounded; it does not solve every open-three combination.
-
-## Project structure
-
-| Path | Purpose |
-|---|---|
-| `src/main/java/caroai/GameEngine.java` | Board state, legal moves and win detection |
-| `src/main/java/caroai/AI.java` | Iterative deepening and alpha-beta search |
-| `src/main/java/caroai/SearchState.java` | Incremental search state and candidate cache |
-| `src/main/java/caroai/Theme.java` | Light/Dark palettes, fonts and stone drawing |
-| `src/main/java/caroai/GameFrame.java` | Screen flow and game lifecycle |
-| `src/test/java/caroai/` | Rules, AI and search regression tests |
-| `bench/` | Benchmark programs and historical measurements |
-
-`GameEngine` owns the board. The UI reads it directly; the AI receives a snapshot before searching on a background thread. Undo, restart and returning to the menu cancel pending AI work.
-
-## Test and benchmark
-
-```bash
-mvn test
-mvn clean package
+```powershell
+mvn verify
+node --test src/test/web/*.test.cjs
 ```
 
-The tests cover game rules, undo, tactical choices and search state consistency. Maven is configured to generate a JaCoCo report during the test phase. No coverage percentage is claimed here without a current report.
+Kết quả gần nhất: **97 kiểm thử Java** và **10 kiểm thử JavaScript** đạt. Node.js chỉ cần để chạy kiểm thử JavaScript. Chưa kiểm thử tải lớn hoặc xác nhận triển khai Docker/Render thực tế.
 
-[The benchmark report](bench/REPORT.md) documents the earlier optimization study, including its machine, fixtures and limitations. **Those numbers were collected with a 1,350 ms Hard budget**; the current game uses 850 ms. Treat the report as historical evidence, not a current latency or playing strength claim.
+## Công nghệ
 
-## Current limits
+- AI: Minimax, alpha-beta, tìm kiếm sâu dần, Zobrist hash và bảng lưu thế cờ; chạy theo ngân sách thời gian.
+- Desktop: Swing / Graphics2D. Web: HTML, CSS, JavaScript và HTTP server Java dùng chung AI.
+- Âm thanh: trích đoạn 1,19–1,44 giây từ file người dùng cung cấp `freesound_community-chess-pieces-60890.mp3`, đóng gói thành WAV.
 
-- This is a local desktop game; there is no online multiplayer or save/load feature.
-- The bounded threat search is not a complete Gomoku solver.
-- Search deadlines can be exceeded by long GC or operating system pauses.
-- Platform specific UI behavior and the current release package still need broader manual verification.
-
-## Author
-
-Created by **nbaotoan**. Contributions are welcome; run `mvn clean package` before submitting changes.
+Tác giả: **nbaotoan**.

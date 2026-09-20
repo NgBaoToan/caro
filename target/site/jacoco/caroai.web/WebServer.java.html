@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebServer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai.web</a> &gt; <span class="el_source">WebServer.java</span></div><h1>WebServer.java</h1><pre class="source lang-java linenums">package caroai.web;
+
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+/** Small same-origin web adapter; the desktop entry point remains available. */
+public final class WebServer implements AutoCloseable {
+<span class="fc" id="L20">    private static final Logger LOG = Logger.getLogger(WebServer.class.getName());</span>
+    private static final int MAX_BODY = 32_768;
+<span class="fc" id="L22">    private static final Map&lt;String, String&gt; ASSETS = Map.of(</span>
+<span class="fc" id="L23">            &quot;/&quot;, &quot;index.html&quot;, &quot;/index.html&quot;, &quot;index.html&quot;, &quot;/app.js&quot;, &quot;app.js&quot;, &quot;/style.css&quot;, &quot;style.css&quot;,</span>
+<span class="fc" id="L24">            &quot;/game-file.js&quot;, &quot;game-file.js&quot;, &quot;/sound.js&quot;, &quot;sound.js&quot;);</span>
+    private final HttpServer server;
+<span class="fc" id="L26">    private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();</span>
+<span class="fc" id="L27">    private final Semaphore searches = new Semaphore(4);</span>
+
+<span class="fc" id="L29">    public WebServer(String host, int port) throws IOException {</span>
+<span class="fc" id="L30">        server = HttpServer.create(new InetSocketAddress(host, port), 32);</span>
+<span class="fc" id="L31">        server.setExecutor(workers);</span>
+<span class="fc" id="L32">        server.createContext(&quot;/&quot;, this::handle);</span>
+<span class="fc" id="L33">        server.start();</span>
+<span class="fc" id="L34">    }</span>
+
+<span class="fc" id="L36">    public int port() { return server.getAddress().getPort(); }</span>
+
+    private void handle(HttpExchange exchange) throws IOException {
+<span class="fc" id="L39">        try (exchange) {</span>
+<span class="fc" id="L40">            exchange.getResponseHeaders().set(&quot;X-Content-Type-Options&quot;, &quot;nosniff&quot;);</span>
+<span class="fc" id="L41">            exchange.getResponseHeaders().set(&quot;Content-Security-Policy&quot;,</span>
+<span class="fc" id="L42">                    &quot;default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; &quot;</span>
+                            + &quot;connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'&quot;);
+<span class="fc" id="L44">            exchange.getResponseHeaders().set(&quot;Cache-Control&quot;, &quot;no-store&quot;);</span>
+<span class="fc" id="L45">            String path = exchange.getRequestURI().getPath();</span>
+<span class="pc bpc" id="L46" title="1 of 4 branches missed.">            if (path.equals(&quot;/healthz&quot;) &amp;&amp; exchange.getRequestMethod().equals(&quot;GET&quot;)) {</span>
+<span class="fc" id="L47">                send(exchange, 200, &quot;text/plain&quot;, &quot;ok&quot;);</span>
+<span class="fc" id="L48">                return;</span>
+            }
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (path.equals(&quot;/api/game&quot;)) {</span>
+<span class="fc" id="L51">                api(exchange);</span>
+<span class="fc" id="L52">                return;</span>
+            }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (!exchange.getRequestMethod().equals(&quot;GET&quot;)) {</span>
+<span class="nc" id="L55">                exchange.getResponseHeaders().set(&quot;Allow&quot;, &quot;GET&quot;);</span>
+<span class="nc" id="L56">                send(exchange, 405, &quot;text/plain&quot;, &quot;Method not allowed&quot;);</span>
+<span class="nc" id="L57">                return;</span>
+            }
+<span class="fc" id="L59">            String asset = ASSETS.get(path);</span>
+<span class="fc bfc" id="L60" title="All 2 branches covered.">            if (path.equals(&quot;/move.wav&quot;)) {</span>
+<span class="fc" id="L61">                try (var stream = WebServer.class.getResourceAsStream(&quot;/caroai/audio/move.wav&quot;)) {</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">                    if (stream == null) throw new IOException(&quot;Missing move sound&quot;);</span>
+<span class="fc" id="L63">                    byte[] bytes = stream.readAllBytes();</span>
+<span class="fc" id="L64">                    exchange.getResponseHeaders().set(&quot;Content-Type&quot;, &quot;audio/wav&quot;);</span>
+<span class="fc" id="L65">                    exchange.sendResponseHeaders(200, bytes.length);</span>
+<span class="fc" id="L66">                    exchange.getResponseBody().write(bytes);</span>
+                }
+<span class="fc" id="L68">                return;</span>
+            }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (asset == null) {</span>
+<span class="fc" id="L71">                send(exchange, 404, &quot;text/plain&quot;, &quot;Not found&quot;);</span>
+<span class="fc" id="L72">                return;</span>
+            }
+<span class="fc" id="L74">            try (var stream = WebServer.class.getResourceAsStream(&quot;/web/&quot; + asset)) {</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                if (stream == null) throw new IOException(&quot;Missing web asset: &quot; + asset);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                String type = asset.endsWith(&quot;.js&quot;) ? &quot;text/javascript&quot;</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">                        : asset.endsWith(&quot;.css&quot;) ? &quot;text/css&quot; : &quot;text/html&quot;;</span>
+<span class="fc" id="L78">                send(exchange, 200, type, new String(stream.readAllBytes(), StandardCharsets.UTF_8));</span>
+            }
+<span class="nc" id="L80">        } catch (IOException e) {</span>
+            // Disconnecting clients must not affect other games.
+<span class="nc" id="L82">            LOG.log(Level.FINE, &quot;HTTP connection closed&quot;, e);</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    private void api(HttpExchange exchange) throws IOException {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!exchange.getRequestMethod().equals(&quot;POST&quot;)) {</span>
+<span class="nc" id="L88">            exchange.getResponseHeaders().set(&quot;Allow&quot;, &quot;POST&quot;);</span>
+<span class="nc" id="L89">            error(exchange, 405, &quot;Chỉ hỗ trợ POST.&quot;);</span>
+<span class="nc" id="L90">            return;</span>
+        }
+<span class="fc" id="L92">        String origin = exchange.getRequestHeaders().getFirst(&quot;Origin&quot;);</span>
+<span class="fc" id="L93">        String host = exchange.getRequestHeaders().getFirst(&quot;Host&quot;);</span>
+<span class="pc bpc" id="L94" title="1 of 4 branches missed.">        if (origin != null &amp;&amp; !sameOrigin(origin, host)) {</span>
+<span class="fc" id="L95">            error(exchange, 403, &quot;Nguồn yêu cầu không hợp lệ.&quot;);</span>
+<span class="fc" id="L96">            return;</span>
+        }
+<span class="fc" id="L98">        String contentType = exchange.getRequestHeaders().getFirst(&quot;Content-Type&quot;);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (contentType == null || !contentType.split(&quot;;&quot;, 2)[0].trim()</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                .equalsIgnoreCase(&quot;application/x-www-form-urlencoded&quot;)) {</span>
+<span class="nc" id="L101">            error(exchange, 415, &quot;Định dạng yêu cầu không hợp lệ.&quot;);</span>
+<span class="nc" id="L102">            return;</span>
+        }
+<span class="fc" id="L104">        byte[] body = exchange.getRequestBody().readNBytes(MAX_BODY + 1);</span>
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (body.length &gt; MAX_BODY) {</span>
+<span class="fc" id="L106">            error(exchange, 413, &quot;Ván cờ quá lớn.&quot;);</span>
+<span class="fc" id="L107">            return;</span>
+        }
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (!searches.tryAcquire()) {</span>
+<span class="nc" id="L110">            error(exchange, 429, &quot;Máy chủ đang bận. Hãy thử lại sau vài giây.&quot;);</span>
+<span class="nc" id="L111">            return;</span>
+        }
+        try {
+<span class="fc" id="L114">            Map&lt;String, String&gt; form = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            for (String field : new String(body, StandardCharsets.UTF_8).split(&quot;&amp;&quot;)) {</span>
+<span class="fc" id="L116">                String[] pair = field.split(&quot;=&quot;, 2);</span>
+<span class="fc" id="L117">                String key = URLDecoder.decode(pair[0], StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">                String value = pair.length == 2 ? URLDecoder.decode(pair[1], StandardCharsets.UTF_8) : &quot;&quot;;</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">                if (form.putIfAbsent(key, value) != null) throw new IllegalArgumentException();</span>
+            }
+<span class="fc" id="L121">            send(exchange, 200, &quot;application/json&quot;, WebGame.respond(form));</span>
+<span class="fc" id="L122">        } catch (IllegalArgumentException e) {</span>
+<span class="fc" id="L123">            error(exchange, 400, &quot;Nước đi hoặc cấu hình ván cờ không hợp lệ.&quot;);</span>
+<span class="nc" id="L124">        } catch (RuntimeException e) {</span>
+<span class="nc" id="L125">            LOG.log(Level.SEVERE, &quot;Web game failed&quot;, e);</span>
+<span class="nc" id="L126">            error(exchange, 500, &quot;Không tính được nước đi. Bạn có thể thử lại hoặc hoàn tác.&quot;);</span>
+        } finally {
+<span class="fc" id="L128">            searches.release();</span>
+        }
+<span class="fc" id="L130">    }</span>
+
+    private static boolean sameOrigin(String origin, String host) {
+        try {
+<span class="fc" id="L134">            URI uri = URI.create(origin);</span>
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">            return (&quot;http&quot;.equals(uri.getScheme()) || &quot;https&quot;.equals(uri.getScheme()))</span>
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">                    &amp;&amp; uri.getRawAuthority() != null &amp;&amp; uri.getRawAuthority().equalsIgnoreCase(host);</span>
+<span class="nc" id="L137">        } catch (IllegalArgumentException e) { return false; }</span>
+    }
+
+    private static void error(HttpExchange exchange, int code, String message) throws IOException {
+<span class="fc" id="L141">        send(exchange, code, &quot;application/json&quot;, &quot;{\&quot;error\&quot;:\&quot;&quot; + message + &quot;\&quot;}&quot;);</span>
+<span class="fc" id="L142">    }</span>
+
+    private static void send(HttpExchange exchange, int code, String type, String body) throws IOException {
+<span class="fc" id="L145">        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);</span>
+<span class="fc" id="L146">        exchange.getResponseHeaders().set(&quot;Content-Type&quot;, type + &quot;; charset=utf-8&quot;);</span>
+<span class="fc" id="L147">        exchange.sendResponseHeaders(code, bytes.length);</span>
+<span class="fc" id="L148">        exchange.getResponseBody().write(bytes);</span>
+<span class="fc" id="L149">    }</span>
+
+    @Override public void close() {
+<span class="fc" id="L152">        server.stop(0);</span>
+<span class="fc" id="L153">        workers.shutdownNow();</span>
+<span class="fc" id="L154">    }</span>
+
+    public static void main(String[] args) throws IOException {
+<span class="nc" id="L157">        String host = System.getenv().getOrDefault(&quot;HOST&quot;, &quot;127.0.0.1&quot;);</span>
+<span class="nc" id="L158">        int port = Integer.parseInt(System.getenv().getOrDefault(&quot;PORT&quot;, &quot;8088&quot;));</span>
+<span class="nc" id="L159">        WebServer app = new WebServer(host, port);</span>
+<span class="nc" id="L160">        Runtime.getRuntime().addShutdownHook(new Thread(app::close));</span>
+<span class="nc" id="L161">        LOG.info(&quot;CaroAI Web: http://&quot; + host + &quot;:&quot; + app.port());</span>
+<span class="nc" id="L162">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

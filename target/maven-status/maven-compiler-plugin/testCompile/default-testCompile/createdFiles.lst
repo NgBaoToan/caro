@@ -1,0 +1,8 @@
+caroai\EvaluatorTest.class
+caroai\GameEngineTest.class
+caroai\MoveHistoryTest.class
+caroai\SearchStateTest.class
+caroai\SearchRegressionTest.class
+caroai\AITest.class
+caroai\AppearanceSettingsTest.class
+caroai\TranspositionTableTest.class

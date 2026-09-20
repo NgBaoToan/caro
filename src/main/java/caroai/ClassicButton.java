@@ -22,7 +22,7 @@ public class ClassicButton extends JComponent {
     }
 
     private static final int ARC      = 8;
-    private static final int EDGE     = 4;   // height of the bottom lip
+    private static final int EDGE     = 7;   // height of the bottom lip
 
     private String label;
     private final String icon;        // may be null
@@ -31,6 +31,7 @@ public class ClassicButton extends JComponent {
     private boolean hovered = false;
     private boolean armed   = false;
     private float   hoverAnim = 0f;
+    private final Timer anim;
 
     private int fontSize = 14;
 
@@ -47,27 +48,36 @@ public class ClassicButton extends JComponent {
 
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        Timer anim = new Timer(16, e -> {
+        anim = new Timer(16, e -> {
             float target = hovered ? 1f : 0f;
             float next = hoverAnim + (target - hoverAnim) * 0.22f;
-            if (Math.abs(next - hoverAnim) > 0.001f) {
+            if (Math.abs(target - next) < 0.005f) {
+                hoverAnim = target;
+                ((Timer) e.getSource()).stop();
+            } else {
                 hoverAnim = next;
-                repaint();
             }
+            repaint();
         });
-        anim.start();
 
         addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { hovered = true;  repaint(); }
-            @Override public void mouseExited(MouseEvent e)  { hovered = false; armed = false; repaint(); }
-            @Override public void mousePressed(MouseEvent e) { armed = true;    repaint(); }
+            @Override public void mouseEntered(MouseEvent e) { hovered = isEnabled(); anim.start(); }
+            @Override public void mouseExited(MouseEvent e)  { hovered = false; armed = false; anim.start(); }
+            @Override public void mousePressed(MouseEvent e) {
+                armed = isEnabled() && SwingUtilities.isLeftMouseButton(e); repaint();
+            }
             @Override public void mouseReleased(MouseEvent e) {
-                boolean fire = armed && hovered;
+                boolean fire = isEnabled() && armed && contains(e.getPoint()) && SwingUtilities.isLeftMouseButton(e);
                 armed = false;
                 repaint();
                 if (fire) fire();
             }
         });
+    }
+
+    @Override public void removeNotify() {
+        anim.stop(); hovered = false; armed = false; hoverAnim = 0;
+        super.removeNotify();
     }
 
     private void fire() {
@@ -94,7 +104,7 @@ public class ClassicButton extends JComponent {
         Theme.antialias(g2);
 
         int w = getWidth(), h = getHeight();
-        int sink = armed ? EDGE : 0;          // how far the face sinks
+        int sink = armed ? EDGE : Math.round(hoverAnim * 4);
 
         Color face, edge, text;
         switch (kind) {
@@ -106,30 +116,34 @@ public class ClassicButton extends JComponent {
             case SECONDARY:
                 face = Theme.mix(Theme.SURFACE_2, Theme.SURFACE_3, hoverAnim);
                 edge = Theme.BORDER;
-                text = Theme.mix(Theme.TEXT_DIM, Theme.TEXT, hoverAnim);
+                text = Theme.TEXT;
                 break;
             default: // QUIET
-                face = Theme.alpha(Theme.SURFACE_2, (int) (90 * hoverAnim));
-                edge = null;
-                text = Theme.mix(Theme.TEXT_FAINT, Theme.TEXT_DIM, hoverAnim);
+                face = Theme.mix(Theme.SURFACE_2, Theme.SURFACE_3, hoverAnim);
+                edge = Theme.mix(Theme.SURFACE_2, Color.BLACK, .35f);
+                text = Theme.TEXT_DIM;
                 break;
         }
 
-        // Bottom lip
+        // Inset glow, cast shadow and a deeper base make the face visibly raised.
+        g2.setColor(Theme.alpha(Theme.ACCENT, (int) (75 * hoverAnim)));
+        g2.fill(Theme.round(0, 0, w, h, ARC + 4));
+        g2.setColor(Theme.alpha(Color.BLACK, 90));
+        g2.fill(Theme.round(2, 4, w - 4, h - 4, ARC));
         if (edge != null) {
             g2.setColor(edge);
-            g2.fill(Theme.round(0, 0, w, h, ARC));
+            g2.fill(Theme.round(2, 2, w - 4, h - 4, ARC));
         }
 
         // Button face
-        g2.setColor(face);
-        g2.fill(Theme.round(0, sink, w, h - EDGE, ARC));
-
-        if (kind == Kind.QUIET) {
-            g2.setColor(Theme.alpha(Theme.BORDER, 160));
-            g2.setStroke(new BasicStroke(1f));
-            g2.draw(Theme.round(0.5, sink + 0.5, w - 1, h - EDGE - 1, ARC));
-        }
+        g2.setPaint(new GradientPaint(0, sink, Theme.mix(face, Color.WHITE, .18f),
+                0, h, Theme.mix(face, Color.BLACK, .12f)));
+        g2.fill(Theme.round(2, 1 + sink, w - 4, h - EDGE - 3, ARC));
+        g2.setColor(Theme.mix(Theme.BORDER_LT, Theme.ACCENT, hoverAnim));
+        g2.setStroke(new BasicStroke(1.2f));
+        g2.draw(Theme.round(2.5, 1.5 + sink, w - 5, h - EDGE - 4, ARC));
+        g2.setColor(Theme.alpha(Color.WHITE, armed ? 35 : 95));
+        g2.drawLine(9, 3 + sink, w - 10, 3 + sink);
 
         // Content
         int centerY = sink + (h - EDGE) / 2;

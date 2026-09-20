@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AI.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">AI.java</span></div><h1>AI.java</h1><pre class="source lang-java linenums"><span class="fc" id="L1">package caroai;</span>
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The computer opponent: minimax with alpha-beta pruning, driven by
+ * {@link Evaluator} and bounded by {@link Difficulty}.
+ *
+ * Search features that keep the search usable on a 50x50 board:
+ *
+ *   Shortlisting — only empty squares within two cells of a stone are
+ *   considered, and only the best few of those survive at each node. Anywhere
+ *   else on the board is irrelevant to the position.
+ *
+ *   Move ordering — candidates are sorted by static score before they are
+ *   searched, so alpha-beta cuts off early and often. Ordering is where most
+ *   of the pruning comes from.
+ *
+ *   Iterative deepening — the search runs to depth 1, then 2, and so on until
+ *   the time budget runs out. The move from the last depth that finished is
+ *   the one played, so the AI always has an answer ready and never returns a
+ *   half-searched one.
+ *
+ *   Incremental score, neighbourhood and threat-window updates live in SearchState.
+ *   Zobrist keys include the side to move; a bounded transposition table stores
+ *   exact/lower/upper bounds. At the horizon a maximum of six forcing plies
+ *   resolves fours and mandatory replies without extending ordinary threes.
+ *
+ * The class holds no board of its own. {@link #findBestMove} takes a snapshot,
+ * copies it, and works on the copy, which is what makes it safe to call from a
+ * background thread while the interface repaints.
+ */
+public final class AI {
+
+    /** Bigger than any score {@link Evaluator} can produce. */
+    static final int WIN_SCORE = 90_000_000;
+
+    private static final int INFINITY  = Integer.MAX_VALUE / 2;
+    private static final int NEIGHBOUR_RADIUS = 2;
+
+    /** Thrown internally when the budget runs out or the caller cancels. */
+    private static final class SearchStopped extends RuntimeException {
+<span class="fc" id="L49">        SearchStopped() { super(null, null, false, false); }   // no stack trace</span>
+    }
+<span class="fc" id="L51">    private static final SearchStopped STOP = new SearchStopped();</span>
+
+    private final int size;
+    private final int winLength;
+
+    private volatile Difficulty difficulty;
+<span class="fc" id="L57">    private volatile boolean    cancelled = false;</span>
+
+    private long deadlineNanos;
+    private long nodes;
+    private int completedDepth;
+    int completedScore;
+<span class="fc" id="L63">    boolean useTranspositions = true; // package scope for exact cached/uncached regression checks</span>
+    private long ttHits, ttCutoffs, threatNodes;
+    private TranspositionTable table;
+    private int branchLimit;
+<span class="fc" id="L67">    private static final int THREAT_PLIES = 6;</span>
+
+    public record SearchStats(long nodes, int completedDepth, long ttHits,
+                              long ttCutoffs, long threatNodes) {}
+    public SearchStats searchStats() {
+<span class="fc" id="L72">        return new SearchStats(nodes, completedDepth, ttHits, ttCutoffs, threatNodes);</span>
+    }
+
+    public AI(int size, int winLength) {
+<span class="fc" id="L76">        this(size, winLength, Difficulty.MEDIUM);</span>
+<span class="fc" id="L77">    }</span>
+
+<span class="fc" id="L79">    public AI(int size, int winLength, Difficulty difficulty) {</span>
+<span class="fc" id="L80">        this.size       = Math.max(1, size);</span>
+<span class="fc" id="L81">        this.winLength  = Math.max(2, winLength);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        this.difficulty = difficulty == null ? Difficulty.MEDIUM : difficulty;</span>
+<span class="fc" id="L83">    }</span>
+
+<span class="nc" id="L85">    public int        getSize()       { return size; }</span>
+<span class="nc" id="L86">    public int        getWinLength()  { return winLength; }</span>
+<span class="nc" id="L87">    public Difficulty getDifficulty() { return difficulty; }</span>
+
+    public void setDifficulty(Difficulty d) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (d != null) this.difficulty = d;</span>
+<span class="fc" id="L91">    }</span>
+
+    /** Asks a running search to give up. Safe to call from another thread. */
+<span class="fc" id="L94">    public void cancelSearch() { cancelled = true; }</span>
+
+    // ── Entry points ─────────────────────────────────────────
+
+    /** Convenience wrapper that snapshots the engine and searches. */
+    public Coord getBestMove(GameEngine engine) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (engine == null) return null;</span>
+<span class="nc" id="L101">        return findBestMove(engine.getBoard(), engine.getAISymbol(), engine.getSize());</span>
+    }
+
+    /**
+     * Best move for {@code me}, or null when there is nothing to reason about
+     * (an empty or a full board). The caller decides what to do in that case —
+     * the AI does not invent an opening square.
+     */
+    public Coord findBestMove(Map&lt;Coord, GameEngine.Cell&gt; snapshot,
+                              GameEngine.Cell me, int boardSize) {
+
+<span class="fc" id="L112">        cancelled = false;</span>
+<span class="fc" id="L113">        nodes     = 0;</span>
+<span class="fc" id="L114">        completedDepth = 0;</span>
+<span class="fc" id="L115">        completedScore = 0;</span>
+<span class="fc" id="L116">        ttHits = ttCutoffs = threatNodes = 0;</span>
+<span class="fc" id="L117">        Difficulty level = difficulty;</span>
+<span class="fc" id="L118">        branchLimit = level.branchLimit();</span>
+<span class="fc" id="L119">        deadlineNanos = System.nanoTime() + level.budgetMillis() * 1_000_000L;</span>
+<span class="fc" id="L120">        table = new TranspositionTable(17);</span>
+
+<span class="pc bpc" id="L122" title="1 of 6 branches missed.">        if (snapshot == null || snapshot.isEmpty() || me == null) return null;</span>
+
+<span class="fc" id="L124">        int limit = Math.min(size, boardSize);</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (limit &lt;= 0) return null;</span>
+<span class="fc" id="L126">        Map&lt;Coord, GameEngine.Cell&gt; board = new HashMap&lt;&gt;(snapshot);</span>
+<span class="fc" id="L127">        GameEngine.Cell them = GameEngine.opponentOf(me);</span>
+
+        // Tactics first. These two are not an optimisation — they are the
+        // guarantee that the AI never misses a win it can take now, and never
+        // ignores a loss it must stop now, whatever the search does afterwards.
+<span class="fc" id="L132">        Coord winning = immediateWin(board, limit, me);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        if (winning != null) return winning;</span>
+
+<span class="fc" id="L135">        Coord blocking = immediateWin(board, limit, them);</span>
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (blocking != null) return blocking;</span>
+
+<span class="fc" id="L138">        List&lt;Coord&gt; roots = shortlist(board, limit, me, them, level.branchLimit());</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (roots.isEmpty()) return null;</span>
+
+<span class="fc" id="L141">        Coord best = roots.get(0);</span>
+<span class="fc" id="L142">        SearchState state = new SearchState(board, limit, winLength, me);</span>
+
+        try {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">            for (int depth = 1; depth &lt;= level.maxDepth(); depth++) {</span>
+<span class="fc" id="L146">                Coord bestAtDepth  = null;</span>
+<span class="fc" id="L147">                int   bestScore    = -INFINITY;</span>
+<span class="fc" id="L148">                int   alpha        = -INFINITY;</span>
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                for (Coord c : roots) {</span>
+<span class="fc" id="L151">                    checkTime();</span>
+<span class="fc" id="L152">                    int score = scoreRootMove(state, c, depth, alpha);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">                    if (score &gt; bestScore) {</span>
+<span class="fc" id="L154">                        bestScore   = score;</span>
+<span class="fc" id="L155">                        bestAtDepth = c;</span>
+                    }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">                    if (score &gt; alpha) alpha = score;</span>
+                }
+
+                // Only commit a depth that finished. If the budget expires part
+                // way through, SearchStopped skips this line and the previous
+                // depth's move stands.
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">                if (bestAtDepth != null) best = bestAtDepth;</span>
+<span class="fc" id="L164">                completedDepth = depth;</span>
+<span class="fc" id="L165">                completedScore = bestScore;</span>
+<span class="fc" id="L166">                roots.remove(best);</span>
+<span class="fc" id="L167">                roots.add(0, best);</span>
+
+                // A forced win is found; searching deeper cannot improve on it.
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (bestScore &gt;= WIN_SCORE - 1000) break;</span>
+            }
+<span class="fc" id="L172">        } catch (SearchStopped stopped) {</span>
+            // Out of time or cancelled — keep the last completed depth.
+        }
+
+<span class="fc" id="L176">        return best;</span>
+    }
+
+    // ── Search ───────────────────────────────────────────────
+
+    private int scoreRootMove(SearchState state, Coord c, int depth, int alpha) {
+<span class="fc" id="L182">        state.place(c, state.me);</span>
+        try {
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">            return winsAt(state.board, c, state.me) ? WIN_SCORE</span>
+<span class="fc" id="L185">                    : minimax(state, depth - 1, 1, alpha, INFINITY, false);</span>
+<span class="fc" id="L186">        } finally { state.undo(); }</span>
+    }
+
+    private int minimax(SearchState state, int depth, int ply,
+                        int alpha, int beta, boolean maximizing) {
+<span class="fc" id="L191">        nodes++;</span>
+<span class="fc" id="L192">        checkTime();</span>
+<span class="fc" id="L193">        int originalAlpha = alpha, originalBeta = beta;</span>
+<span class="fc" id="L194">        long key = state.key(maximizing);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        TranspositionTable.Entry cached = useTranspositions ? table.get(key) : null;</span>
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if (cached != null) {</span>
+<span class="fc" id="L197">            ttHits++;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            if (cached.depth() &gt;= depth) {</span>
+<span class="fc" id="L199">                int score = fromTable(cached.score(), ply);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                if (cached.bound() == TranspositionTable.Bound.EXACT) { ttCutoffs++; return score; }</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                if (cached.bound() == TranspositionTable.Bound.LOWER) alpha = Math.max(alpha, score);</span>
+<span class="fc" id="L202">                else beta = Math.min(beta, score);</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">                if (alpha &gt;= beta) { ttCutoffs++; return score; }</span>
+            }
+        }
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        if (depth &lt;= 0) {</span>
+<span class="fc" id="L207">            int score = threats(state, THREAT_PLIES, ply, alpha, beta, maximizing);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            TranspositionTable.Bound bound = score &lt;= originalAlpha ? TranspositionTable.Bound.UPPER</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    : score &gt;= originalBeta ? TranspositionTable.Bound.LOWER : TranspositionTable.Bound.EXACT;</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">            if (useTranspositions) table.put(key, 0, toTable(score, ply), bound, null);</span>
+<span class="fc" id="L211">            return score;</span>
+        }
+<span class="fc" id="L213">        List&lt;SearchState.Candidate&gt; moves = ordered(state, maximizing, false);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (moves.isEmpty()) return state.score();</span>
+<span class="fc bfc" id="L215" title="All 4 branches covered.">        if (cached != null &amp;&amp; cached.move() != null) {</span>
+<span class="pc bpc" id="L216" title="1 of 4 branches missed.">            for (int i = 0; i &lt; moves.size(); i++) if (moves.get(i).move().equals(cached.move())) {</span>
+<span class="fc" id="L217">                moves.add(0, moves.remove(i)); break;</span>
+            }
+        }
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        int best = maximizing ? -INFINITY : INFINITY;</span>
+<span class="fc" id="L221">        Coord bestMove = null;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        for (SearchState.Candidate candidate : moves) {</span>
+<span class="fc" id="L223">            checkTime();</span>
+<span class="fc" id="L224">            Coord c = candidate.move();</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            GameEngine.Cell mover = maximizing ? state.me : state.them;</span>
+<span class="fc" id="L226">            state.place(c, mover);</span>
+            int score;
+            try {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">                score = winsAt(state.board, c, mover)</span>
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                        ? (maximizing ? WIN_SCORE - ply : -WIN_SCORE + ply)</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">                        : minimax(state, depth - 1, ply + 1, alpha, beta, !maximizing);</span>
+<span class="fc" id="L232">            } finally { state.undo(); }</span>
+<span class="fc bfc" id="L233" title="All 8 branches covered.">            if (bestMove == null || (maximizing ? score &gt; best : score &lt; best)) { best = score; bestMove = c; }</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            if (alpha &gt;= beta) break;</span>
+        }
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        TranspositionTable.Bound bound = best &lt;= originalAlpha ? TranspositionTable.Bound.UPPER</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                : best &gt;= originalBeta ? TranspositionTable.Bound.LOWER : TranspositionTable.Bound.EXACT;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (useTranspositions) table.put(key, depth, toTable(best, ply), bound, bestMove);</span>
+<span class="fc" id="L240">        return best;</span>
+    }
+
+    /** Bounded four-threat quiescence: wins, mandatory blocks, or moves creating a four.
+     * Stand-pat is allowed only when the opponent has no immediate winning square.
+     * Quiet full-width search still happens above the horizon; this is not a complete
+     * all-threat proof solver (open-three combinations are deliberately excluded).
+     */
+    private int threats(SearchState state, int remaining, int ply,
+                        int alpha, int beta, boolean maximizing) {
+<span class="fc" id="L250">        checkTime();</span>
+<span class="fc" id="L251">        threatNodes++;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (remaining == 0) return state.score();</span>
+<span class="fc" id="L253">        List&lt;SearchState.Candidate&gt; moves = ordered(state, maximizing, true);</span>
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        if (moves.isEmpty()) return state.score();</span>
+<span class="fc" id="L255">        boolean mustReply = moves.stream().anyMatch(c -&gt;</span>
+<span class="fc bfc" id="L256" title="All 4 branches covered.">                (maximizing ? c.defence() : c.attack()) &gt;= Pattern.FIVE.score());</span>
+<span class="fc bfc" id="L257" title="All 4 branches covered.">        int best = mustReply ? (maximizing ? -INFINITY : INFINITY) : state.score();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (!mustReply) {</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);</span>
+<span class="fc bfc" id="L260" title="All 2 branches covered.">            if (alpha &gt;= beta) return best;</span>
+        }
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        for (SearchState.Candidate candidate : moves) {</span>
+<span class="fc" id="L263">            checkTime();</span>
+<span class="fc" id="L264">            Coord c = candidate.move();</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            GameEngine.Cell mover = maximizing ? state.me : state.them;</span>
+<span class="fc" id="L266">            state.place(c, mover);</span>
+            int score;
+            try {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                score = winsAt(state.board, c, mover)</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                        ? (maximizing ? WIN_SCORE - ply : -WIN_SCORE + ply)</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                        : threats(state, remaining - 1, ply + 1, alpha, beta, !maximizing);</span>
+<span class="fc" id="L272">            } finally { state.undo(); }</span>
+<span class="fc bfc" id="L273" title="All 2 branches covered.">            best = maximizing ? Math.max(best, score) : Math.min(best, score);</span>
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (maximizing) alpha = Math.max(alpha, best); else beta = Math.min(beta, best);</span>
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (alpha &gt;= beta) break;</span>
+        }
+<span class="fc" id="L277">        return best;</span>
+    }
+
+    private List&lt;SearchState.Candidate&gt; ordered(SearchState state, boolean maximizing, boolean forcingOnly) {
+<span class="pc bpc" id="L281" title="1 of 4 branches missed.">        List&lt;SearchState.Candidate&gt; all = state.candidates(this::checkTime, forcingOnly &amp;&amp; winLength == 5);</span>
+<span class="fc bfc" id="L282" title="All 4 branches covered.">        boolean hasWin = all.stream().anyMatch(c -&gt; (maximizing ? c.attack() : c.defence()) &gt;= Pattern.FIVE.score());</span>
+<span class="fc bfc" id="L283" title="All 4 branches covered.">        boolean hasBlock = all.stream().anyMatch(c -&gt; (maximizing ? c.defence() : c.attack()) &gt;= Pattern.FIVE.score());</span>
+<span class="fc" id="L284">        all.removeIf(c -&gt; {</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">            int own = maximizing ? c.attack() : c.defence();</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            int enemy = maximizing ? c.defence() : c.attack();</span>
+<span class="fc bfc" id="L287" title="All 4 branches covered.">            if (hasWin) return own &lt; Pattern.FIVE.score();</span>
+<span class="fc bfc" id="L288" title="All 4 branches covered.">            if (hasBlock) return enemy &lt; Pattern.FIVE.score();</span>
+<span class="fc bfc" id="L289" title="All 4 branches covered.">            return forcingOnly &amp;&amp; own &lt; Pattern.FOUR.score();</span>
+        });
+<span class="fc" id="L291">        all.sort(Comparator.comparingInt((SearchState.Candidate c) -&gt; -c.rank(maximizing))</span>
+<span class="fc" id="L292">                .thenComparingInt(c -&gt; c.move().col()).thenComparingInt(c -&gt; c.move().row()));</span>
+        // Never discard a mandatory reply or a forcing move just because of the beam width.
+<span class="pc bpc" id="L294" title="1 of 8 branches missed.">        return !forcingOnly &amp;&amp; !hasWin &amp;&amp; !hasBlock &amp;&amp; all.size() &gt; branchLimit</span>
+<span class="fc" id="L295">                ? new ArrayList&lt;&gt;(all.subList(0, branchLimit)) : all;</span>
+    }
+
+    private static int toTable(int score, int ply) {
+<span class="fc bfc" id="L299" title="All 4 branches covered.">        return score &gt;= WIN_SCORE - 1000 ? score + ply : score &lt;= -WIN_SCORE + 1000 ? score - ply : score;</span>
+    }
+    private static int fromTable(int score, int ply) {
+<span class="pc bpc" id="L302" title="2 of 4 branches missed.">        return score &gt;= WIN_SCORE - 1000 ? score - ply : score &lt;= -WIN_SCORE + 1000 ? score + ply : score;</span>
+    }
+    private void checkTime() {
+<span class="pc bpc" id="L305" title="1 of 6 branches missed.">        if (cancelled || Thread.currentThread().isInterrupted() || System.nanoTime() &gt;= deadlineNanos) throw STOP;</span>
+<span class="fc" id="L306">    }</span>
+    // ── Candidate moves ──────────────────────────────────────
+
+    /**
+     * Empty squares worth considering, best first, capped at {@code limit}.
+     *
+     * A square only qualifies if a stone sits within {@link #NEIGHBOUR_RADIUS}
+     * of it. On an otherwise empty board that leaves nothing, which is why an
+     * empty position returns no candidates at all.
+     */
+    List&lt;Coord&gt; shortlist(Map&lt;Coord, GameEngine.Cell&gt; board, int boardLimit,
+                          GameEngine.Cell mover, GameEngine.Cell other, int limit) {
+
+<span class="fc" id="L319">        List&lt;Coord&gt; raw = new ArrayList&lt;&gt;(neighbourhood(board, boardLimit));</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (raw.isEmpty()) return raw;</span>
+
+<span class="fc" id="L322">        Map&lt;Coord, Integer&gt; ranking = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">        for (Coord c : raw) {</span>
+<span class="fc" id="L324">            int attack = Evaluator.scoreAt(board, boardLimit, c, mover, winLength);</span>
+<span class="fc" id="L325">            int defend = Evaluator.scoreAt(board, boardLimit, c, other, winLength);</span>
+<span class="fc" id="L326">            ranking.put(c, attack + (int) (Evaluator.DEFENCE_WEIGHT * defend));</span>
+        }
+
+        // Sort by score, then by coordinate, so the result never depends on
+        // hash order — an unstable search makes tests unreproducible.
+<span class="fc" id="L331">        raw.sort(Comparator</span>
+<span class="fc" id="L332">                .comparingInt((Coord c) -&gt; -ranking.get(c))</span>
+<span class="fc" id="L333">                .thenComparingInt(Coord::col)</span>
+<span class="fc" id="L334">                .thenComparingInt(Coord::row));</span>
+
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        return raw.size() &gt; limit ? new ArrayList&lt;&gt;(raw.subList(0, limit)) : raw;</span>
+    }
+
+    /**
+     * Every empty square within the neighbourhood radius of some stone.
+     *
+     * Deduplication goes through a hash set rather than a list scan — this runs
+     * at every node of the search, and a linear scan here would dominate the
+     * whole cost.
+     */
+    private List&lt;Coord&gt; neighbourhood(Map&lt;Coord, GameEngine.Cell&gt; board, int boardLimit) {
+<span class="fc" id="L347">        Set&lt;Coord&gt; out = new LinkedHashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (Coord stone : board.keySet()) {</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            for (int dCol = -NEIGHBOUR_RADIUS; dCol &lt;= NEIGHBOUR_RADIUS; dCol++) {</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                for (int dRow = -NEIGHBOUR_RADIUS; dRow &lt;= NEIGHBOUR_RADIUS; dRow++) {</span>
+<span class="fc bfc" id="L352" title="All 4 branches covered.">                    if (dCol == 0 &amp;&amp; dRow == 0) continue;</span>
+<span class="fc" id="L353">                    Coord c = stone.offset(dCol, dRow);</span>
+<span class="fc bfc" id="L354" title="All 2 branches covered.">                    if (!c.isInside(boardLimit)) continue;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                    if (board.containsKey(c))    continue;</span>
+<span class="fc" id="L356">                    out.add(c);</span>
+                }
+            }
+        }
+<span class="fc" id="L360">        return new ArrayList&lt;&gt;(out);</span>
+    }
+
+    /** The square that completes five for {@code player}, or null. */
+    Coord immediateWin(Map&lt;Coord, GameEngine.Cell&gt; board, int boardLimit,
+                       GameEngine.Cell player) {
+<span class="fc" id="L366">        List&lt;Coord&gt; best = null;</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        for (Coord c : neighbourhood(board, boardLimit)) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            if (Evaluator.makesFive(board, boardLimit, c, player, winLength)) {</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                if (best == null) best = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L370">                best.add(c);</span>
+            }
+        }
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        if (best == null) return null;</span>
+
+        // Deterministic pick when several squares win.
+<span class="fc" id="L376">        best.sort(Comparator.comparingInt(Coord::col).thenComparingInt(Coord::row));</span>
+<span class="fc" id="L377">        return best.get(0);</span>
+    }
+
+    private boolean winsAt(Map&lt;Coord, GameEngine.Cell&gt; board, Coord c,
+                           GameEngine.Cell player) {
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        for (int[] d : Evaluator.DIRECTIONS) {</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (Evaluator.solidLength(board, c, d, player) &gt;= winLength) return true;</span>
+        }
+<span class="fc" id="L385">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>

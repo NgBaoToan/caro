@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SoundEffects.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">CaroAI</a> &gt; <a href="index.source.html" class="el_package">caroai</a> &gt; <span class="el_source">SoundEffects.java</span></div><h1>SoundEffects.java</h1><pre class="source lang-java linenums">package caroai;
+
+import java.awt.GraphicsEnvironment;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.prefs.Preferences;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.UnsupportedAudioFileException;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+
+/** Bundled move recording; audio device work never runs on Swing's event thread. */
+final class SoundEffects {
+<span class="fc" id="L19">    private static final Logger LOG = Logger.getLogger(SoundEffects.class.getName());</span>
+<span class="fc" id="L20">    private static final Preferences PREFS = Preferences.userNodeForPackage(SoundEffects.class);</span>
+<span class="fc" id="L21">    private static final ThreadPoolExecutor AUDIO = new ThreadPoolExecutor(1, 1, 0,</span>
+<span class="fc" id="L22">            TimeUnit.MILLISECONDS, new ArrayBlockingQueue&lt;&gt;(1), runnable -&gt; {</span>
+<span class="nc" id="L23">                Thread thread = new Thread(runnable, &quot;caro-sound&quot;);</span>
+<span class="nc" id="L24">                thread.setDaemon(true);</span>
+<span class="nc" id="L25">                return thread;</span>
+<span class="fc" id="L26">            }, new ThreadPoolExecutor.DiscardOldestPolicy());</span>
+<span class="fc" id="L27">    private static volatile boolean enabled = PREFS.getBoolean(&quot;moveSound&quot;, true);</span>
+    private static volatile long generation;
+    private static Clip clip; // Used only by the audio worker.
+<span class="fc" id="L30">    private static boolean unavailable;</span>
+
+    private SoundEffects() {}
+
+<span class="nc" id="L34">    static boolean isEnabled() { return enabled; }</span>
+
+    static void setEnabled(boolean value) {
+<span class="nc" id="L37">        enabled = value;</span>
+<span class="nc" id="L38">        generation++;</span>
+<span class="nc" id="L39">        PREFS.putBoolean(&quot;moveSound&quot;, value);</span>
+<span class="nc bnc" id="L40" title="All 4 branches missed.">        if (!value) AUDIO.execute(() -&gt; { if (clip != null) clip.stop(); });</span>
+<span class="nc" id="L41">    }</span>
+
+    static void playMove() {
+<span class="nc bnc" id="L44" title="All 4 branches missed.">        if (!enabled || GraphicsEnvironment.isHeadless()) return;</span>
+<span class="nc" id="L45">        long request = generation;</span>
+<span class="nc" id="L46">        AUDIO.execute(() -&gt; {</span>
+<span class="nc bnc" id="L47" title="All 6 branches missed.">            if (!enabled || request != generation || unavailable) return;</span>
+            try {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">                if (clip == null) {</span>
+<span class="nc" id="L50">                    Clip candidate = AudioSystem.getClip();</span>
+<span class="nc" id="L51">                    try (AudioInputStream recording = openMoveAudio()) {</span>
+<span class="nc" id="L52">                        candidate.open(recording);</span>
+<span class="nc" id="L53">                        clip = candidate;</span>
+<span class="nc" id="L54">                    } catch (Exception error) {</span>
+<span class="nc" id="L55">                        candidate.close();</span>
+<span class="nc" id="L56">                        throw error;</span>
+                    }
+                }
+<span class="nc bnc" id="L59" title="All 4 branches missed.">                if (!enabled || request != generation) return;</span>
+<span class="nc" id="L60">                clip.stop();</span>
+<span class="nc" id="L61">                clip.setFramePosition(0);</span>
+<span class="nc" id="L62">                clip.start();</span>
+<span class="nc" id="L63">            } catch (Exception error) {</span>
+<span class="nc" id="L64">                unavailable = true;</span>
+<span class="nc" id="L65">                LOG.log(Level.WARNING, &quot;Move sound unavailable; continuing without audio&quot;, error);</span>
+            }
+<span class="nc" id="L67">        });</span>
+<span class="nc" id="L68">    }</span>
+
+    /** Single trimmed tap from the supplied chess-pieces recording, packaged as PCM WAV. */
+    static AudioInputStream openMoveAudio() throws IOException, UnsupportedAudioFileException {
+<span class="fc" id="L72">        var resource = SoundEffects.class.getResourceAsStream(&quot;/caroai/audio/move.wav&quot;);</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (resource == null) throw new IOException(&quot;Missing move sound resource&quot;);</span>
+<span class="fc" id="L74">        var buffered = new BufferedInputStream(resource);</span>
+        try {
+<span class="fc" id="L76">            return AudioSystem.getAudioInputStream(buffered);</span>
+<span class="nc" id="L77">        } catch (IOException | UnsupportedAudioFileException | RuntimeException error) {</span>
+<span class="nc" id="L78">            buffered.close();</span>
+<span class="nc" id="L79">            throw error;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.12.202403310830</span></div></body></html>
