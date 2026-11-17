@@ -44,6 +44,8 @@ node --test src/test/web/*.test.cjs
 
 Hướng dẫn triển khai web: [Render / Docker](docs/WEB_DEPLOY.md).
 
+Phát hành bản tải xuống kèm link chơi trực tuyến: [quy trình GitHub Release](docs/RELEASE.md).
+
 ## 2. Công nghệ sử dụng
 
 | Thành phần | Công nghệ | Vai trò |

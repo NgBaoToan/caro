@@ -1,0 +1,169 @@
+name: Release CaroAI
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'New release tag (for example v1.0.0)'
+        required: true
+        default: v1.0.0
+        type: string
+      play_url:
+        description: 'Public HTTPS URL of the deployed Java web game'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify website, test and package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      PLAY_URL: ${{ inputs.play_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Validate inputs and deployed game
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import time
+          import urllib.parse
+          import urllib.request
+
+          tag = os.environ['RELEASE_TAG']
+          url = os.environ['PLAY_URL'].rstrip('/')
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag):
+              raise SystemExit('Tag must have the form vMAJOR.MINOR.PATCH.')
+          parts = urllib.parse.urlsplit(url)
+          if (parts.scheme != 'https' or not parts.hostname or parts.username
+                  or parts.password or parts.query or parts.fragment):
+              raise SystemExit('play_url must be a public HTTPS game URL without credentials, query or fragment.')
+          origin = f'{parts.scheme}://{parts.netloc}'
+
+          # Require the supplied canonical URL; redirects must not hide another origin.
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+
+          client = urllib.request.build_opener(NoRedirect())
+          def get(request):
+              for attempt in range(5):
+                  try:
+                      with client.open(request, timeout=60) as response:
+                          if response.status != 200:
+                              raise RuntimeError(f'Unexpected status {response.status}')
+                          return response.read()
+                  except Exception:
+                      if attempt == 4:
+                          raise
+                      time.sleep(5)
+
+          html = get(url + '/').decode('utf-8')
+          if '<canvas id="board"' not in html:
+              raise SystemExit('Website did not serve the CaroAI board interface.')
+          if get(url + '/healthz').strip() != b'ok':
+              raise SystemExit('Website health check did not return ok.')
+          body = urllib.parse.urlencode({
+              'mode': 'local', 'human': 'X', 'difficulty': 'EASY',
+              'action': 'state', 'moves': '25,25;26,25'
+          }).encode()
+          request = urllib.request.Request(url + '/api/game', data=body, headers={
+              'Content-Type': 'application/x-www-form-urlencoded', 'Origin': origin
+          })
+          state = json.loads(get(request))
+          if (state.get('size') != 50 or state.get('moves') != [[25, 25], [26, 25]]
+                  or state.get('turn') != 'X' or state.get('winner') is not None
+                  or state.get('draw') is not False):
+              raise SystemExit('Deployed API did not return the expected replayed game state.')
+          ai_body = urllib.parse.urlencode({
+              'mode': 'ai', 'human': 'X', 'difficulty': 'EASY',
+              'action': 'reply', 'moves': '25,25'
+          }).encode()
+          ai_request = urllib.request.Request(url + '/api/game', data=ai_body, headers={
+              'Content-Type': 'application/x-www-form-urlencoded', 'Origin': origin
+          })
+          reply = json.loads(get(ai_request))
+          moves = reply.get('moves', [])
+          if (len(moves) != 2 or moves[0] != [25, 25]
+                  or moves[1] == moves[0] or reply.get('turn') != 'X'):
+              raise SystemExit('Deployed AI did not return a legal reply.')
+          print('Verified public board interface, health, history replay and AI reply.')
+          PY
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify Java and JavaScript
+        run: |
+          mvn --batch-mode --no-transfer-progress -Djava.awt.headless=true verify
+          node --test src/test/web/*.test.cjs
+      - name: Package standalone downloads
+        shell: bash
+        run: |
+          python3 scripts/package-release.py \
+            --tag "$RELEASE_TAG" \
+            --play-url "$PLAY_URL" \
+            --repository "$GITHUB_REPOSITORY" \
+            --source-sha "$GITHUB_SHA"
+          printf '\nĐã kiểm tra /healthz và API ván cờ của website; Java và JavaScript đều qua kiểm thử.\n' >> dist/release-notes.md
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-files
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Create GitHub Release
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-files
+          path: dist/
+      - name: Publish a new release without overwriting existing releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; it will not be modified."
+            exit 1
+          fi
+          # Reject existing tags as well, so downloaded binaries cannot be attached
+          # to a tag that refers to a different source revision.
+          if gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists. Choose a new release tag."
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            --repo "$GH_REPO" \
+            --target "$GITHUB_SHA" \
+            --title "CaroAI $RELEASE_TAG" \
+            --notes-file dist/release-notes.md \
+            "dist/caroai-$RELEASE_TAG.jar" \
+            "dist/CaroAI-$RELEASE_TAG.zip" \
+            dist/SHA256SUMS.txt

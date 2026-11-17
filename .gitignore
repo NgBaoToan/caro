@@ -1,6 +1,7 @@
 # Generated builds and runtime output
 /target/
 /out/
+/dist/
 /bench/build/
 /logs/
 *.class
