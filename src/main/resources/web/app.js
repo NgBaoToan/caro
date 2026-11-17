@@ -27,6 +27,27 @@ function applyAppearance() {
 $('theme').addEventListener('click', () => { theme = theme === 'dark' ? 'light' : 'dark'; applyAppearance(); });
 $('stone-style').addEventListener('change', event => { stoneStyle = event.target.value; applyAppearance(); });
 function emptyGame() { return {moves: [], turn: 'X', winner: null, draw: false, winningLine: [], aiMillis: 0}; }
+const autosaveKey = 'caroai.game.v1';
+function autosave() {
+  try {
+    localStorage.setItem(autosaveKey, CaroFiles.serialize(config, game.moves));
+    $('file-status').textContent = 'Đã tự lưu ván trên trình duyệt này. Có thể tải lại trang để chơi tiếp.';
+  } catch {
+    $('file-status').textContent = 'Không thể tự lưu. Hãy lưu tệp JSON để giữ ván cờ.';
+  }
+}
+function restoreAutosave() {
+  try {
+    const saved = localStorage.getItem(autosaveKey);
+    if (!saved) return;
+    const candidate = CaroFiles.parse(saved);
+    config = candidate.config;
+    game = {...emptyGame(), moves: candidate.moves};
+    $('file-status').textContent = 'Đang kiểm tra và khôi phục ván đã tự lưu…';
+  } catch {
+    $('file-status').textContent = 'Không đọc được ván tự lưu. Bạn có thể mở tệp JSON hoặc bắt đầu ván mới.';
+  }
+}
 function turn() { return game.moves.length % 2 ? 'O' : 'X'; }
 function ended() { return Boolean(game.winner || game.draw); }
 function occupied(col, row) { return game.moves.some(c => c[0] === col && c[1] === row); }
@@ -63,6 +84,7 @@ async function synchronize(action = 'reply') {
       if (hint) { cursor = [...hint]; reveal(hint); }
     } else {
       game = data;
+      autosave();
       if (action === 'reply') {
         if (game.winner) CaroSound.play(config.mode === 'ai' && game.winner !== config.human ? 'lose' : 'win');
         else if (game.draw) CaroSound.play('draw');
@@ -71,6 +93,7 @@ async function synchronize(action = 'reply') {
       if (game.moves.length) reveal(game.moves.at(-1));
     }
     render();
+    if (action === 'state' && config.mode === 'ai' && !ended() && turn() !== config.human) synchronize();
   } catch (error) {
     if (version !== requestVersion) return;
     busy = false; busyAction = '';
@@ -83,6 +106,7 @@ function play(col, row) {
   if (config.mode === 'ai' && turn() !== config.human) return;
   CaroSound.unlock(); clearHint();
   game.moves.push([col, row]);
+  autosave();
   hover = null; cursor = [col, row];
   synchronize();
   CaroSound.play('move');
@@ -93,6 +117,7 @@ function undo() {
   cancelRequest();
   CaroSound.stop(); clearHint();
   game = {...emptyGame(), moves: game.moves.slice(0, index)};
+  autosave();
   synchronize('state');
 }
 function render() {
@@ -235,7 +260,7 @@ const settings=$('settings-dialog'), form=$('settings-form');
 function updateOptions(){const ai=form.elements.mode.value==='ai';$('side-options').hidden=!ai;$('difficulty-options').hidden=!ai;}
 $('new-game').addEventListener('click',()=>{for(const [key,value]of Object.entries(config))form.elements[key].value=value;updateOptions();settings.showModal();});
 $('close-settings').addEventListener('click',()=>settings.close());form.addEventListener('change',updateOptions);
-form.addEventListener('submit',event=>{event.preventDefault();cancelRequest();CaroSound.stop();CaroSound.unlock();clearHint();config={mode:form.elements.mode.value,human:form.elements.human.value,difficulty:form.elements.difficulty.value};game=emptyGame();failure='';camera={col:25,row:25};cursor=[25,25];hover=null;settings.close();synchronize();});
+form.addEventListener('submit',event=>{event.preventDefault();cancelRequest();CaroSound.stop();CaroSound.unlock();clearHint();config={mode:form.elements.mode.value,human:form.elements.human.value,difficulty:form.elements.difficulty.value};game=emptyGame();autosave();failure='';camera={col:25,row:25};cursor=[25,25];hover=null;settings.close();synchronize();});
 $('help').addEventListener('click',()=>$('help-dialog').showModal());$('close-help').addEventListener('click',()=>$('help-dialog').close());
 function updateSoundButton() {
   $('sound').textContent = `Âm thanh: ${CaroSound.isEnabled() ? 'Bật' : 'Tắt'}`;
@@ -281,7 +306,7 @@ $('load-form').addEventListener('submit', async event => {
     const validated = await requestGame(candidate.config, candidate.moves, 'state', signal);
     if (version !== requestVersion) return;
     // Commit only after the complete history has passed server validation.
-    config = candidate.config; game = validated; failure = ''; busy = false; busyAction = '';
+    config = candidate.config; game = validated; autosave(); failure = ''; busy = false; busyAction = '';
     clearHint(); CaroSound.stop(); hover = null;
     const last = game.moves.at(-1) || [25,25];
     camera = {col: last[0], row: last[1]}; cursor = [...last];
@@ -295,4 +320,4 @@ $('load-form').addEventListener('submit', async event => {
   } finally { clearTimeout(timeout); $('load-submit').disabled = false; }
 });
 new ResizeObserver(resize).observe(canvas);
-applyAppearance();render();synchronize('state');
+restoreAutosave();applyAppearance();render();synchronize('state');

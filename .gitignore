@@ -1,0 +1,17 @@
+# Generated builds and runtime output
+/target/
+/out/
+/bench/build/
+/logs/
+*.class
+*.jar
+*.log
+*.log.*
+*.jfr
+
+# Local editor and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

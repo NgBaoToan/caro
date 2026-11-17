@@ -154,7 +154,8 @@ public class ClassicButton extends JComponent {
             Theme.drawCentered(g2, label, w / 2, centerY);
         } else {
             // Icon on the left, label right after it
-            g2.setFont(Theme.ui(Font.PLAIN, fontSize + 3));
+            // Logical fonts provide platform glyph fallback for arrows and symbols.
+            g2.setFont(new Font(Font.DIALOG, Font.PLAIN, fontSize + 3));
             FontMetrics ifm = g2.getFontMetrics();
             int iconX = 20;
             g2.drawString(icon, iconX,

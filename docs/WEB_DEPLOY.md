@@ -18,7 +18,7 @@ Trong PowerShell tại `D:\proj\caro`:
 ```
 
 Mở http://127.0.0.1:8088. Địa chỉ này chỉ dùng trên máy đang chạy game.
-Ctrl+C để dừng. Lưu ván trước khi tải lại trang.
+Ctrl+C để dừng. Ván được tự lưu trên trình duyệt và khôi phục khi tải lại trang; xuất JSON để sao lưu hoặc chuyển thiết bị.
 
 ## Đưa lên Render
 

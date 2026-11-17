@@ -29,6 +29,7 @@ public class BoardPanel extends JPanel {
     private Coord       hoverCell   = null;
     private List<Coord> winningLine = new ArrayList<>();
     private boolean     gameOver    = false;   // blocks clicks once the game ends
+    private Timer       winBlink;
 
     /**
      * The AI runs on a background thread, so a long search never freezes the
@@ -290,6 +291,7 @@ public class BoardPanel extends JPanel {
 
     /** Cancels a running search (undo, restart, back to menu). */
     public void cancelPendingAI() {
+        stopWinBlink();
         clearHint();
         if (ai != null) ai.cancelSearch();
         if (aiWorker != null) {
@@ -359,12 +361,14 @@ public class BoardPanel extends JPanel {
 
     /** Allows play to continue after undoing a finished game. */
     public void clearGameOver() {
+        stopWinBlink();
         clearHint();
         gameOver    = false;
         winningLine = new ArrayList<>();
     }
 
     public void resetState() {
+        stopWinBlink();
         clearHint();
         gameOver    = false;
         lastMove    = null;
@@ -376,21 +380,42 @@ public class BoardPanel extends JPanel {
 
     /** Flash the winning line, then hand over to the result overlay. */
     private void triggerWin() {
+        stopWinBlink();
         gameOver  = true;
         hoverCell = null;
 
         Timer blink = new Timer(300, null);
+        winBlink = blink;
+        final Player winner = engine.getCurrentPlayer();
         final int[] count = {0};
         blink.addActionListener(e -> {
+            // A stopped timer may already have queued a callback on the EDT.
+            if (winBlink != blink || !gameOver) {
+                blink.stop();
+                return;
+            }
             count[0]++;
             repaint();
             if (count[0] >= 6) {
-                blink.stop();
+                stopWinBlink();
                 GameFrame frame = (GameFrame) SwingUtilities.getWindowAncestor(this);
-                if (frame != null) frame.showWinOverlay(engine.getCurrentPlayer());
+                if (frame != null) frame.showWinOverlay(winner);
             }
         });
         blink.start();
+    }
+
+    private void stopWinBlink() {
+        if (winBlink != null) {
+            winBlink.stop();
+            winBlink = null;
+        }
+    }
+
+    @Override
+    public void removeNotify() {
+        cancelPendingAI();
+        super.removeNotify();
     }
 
     // ── Painting ─────────────────────────────────────────────
